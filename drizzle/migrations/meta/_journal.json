@@ -8,6 +8,13 @@
       "when": 1793979931718,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793995063177,
+      "tag": "0001_magic_caption_daily_limit",
+      "breakpoints": true
     }
   ]
 }

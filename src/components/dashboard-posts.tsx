@@ -5,6 +5,8 @@ import {
   type BufferChannel, type ChannelsResult, type IdeasResult, type WriteResult,
 } from "@/lib/buffer.functions";
 import { charLimit } from "@/lib/trends.functions";
+import { magicCaption, getMagicCaptionAllowance } from "@/lib/magic.functions";
+import { Sparkles, Undo2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -15,6 +17,56 @@ export type Prefill = { text: string; ideaId?: string | undefined; key: number }
 const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
 const btn = "inline-flex h-10 items-center rounded-full border border-border px-5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50";
 const primary = "inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:opacity-50";
+const btnSmall = "inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50";
+
+function MagicBar({ text, setText, limit, limitNote }: { text: string; setText: (v: string) => void; limit: number; limitNote?: string | undefined }) {
+  const run = useServerFn(magicCaption);
+  const loadLeft = useServerFn(getMagicCaptionAllowance);
+  const [instruction, setInstruction] = useState("");
+  const [left, setLeft] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [prev, setPrev] = useState<string | null>(null);
+
+  useEffect(() => { loadLeft().then((r) => setLeft(r.left)).catch(() => {}); }, [loadLeft]);
+
+  async function go() {
+    setBusy(true); setError(null);
+    try {
+      const r = await run({ data: { text: text.trim(), ...(instruction.trim() ? { instruction: instruction.trim() } : {}), limit } });
+      setLeft(r.left);
+      if (r.ok) { setPrev(text); setText(r.text); }
+      else setError(r.error);
+    } catch { setError("Couldn't rewrite the caption right now. Please try again."); }
+    setBusy(false);
+  }
+
+  const out = left === 0;
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <input value={instruction} onChange={(e) => setInstruction(e.target.value)} maxLength={200}
+          placeholder="e.g. make it punchier, friendly tone" aria-label="Instruction (optional)"
+          className={`${input} h-9 min-w-40 flex-1 py-0 text-xs`} />
+        <span className={`text-xs ${limit > 0 && text.length > limit ? "text-destructive" : "text-muted-foreground"}`}>
+          {text.length}{limit > 0 ? `/${limit}` : " characters"}{limitNote ? ` (${limitNote})` : ""}
+        </span>
+        {prev !== null && (
+          <button type="button" className={btnSmall} onClick={() => { setText(prev); setPrev(null); }}>
+            <Undo2 className="h-3.5 w-3.5" aria-hidden /> Undo
+          </button>
+        )}
+        <button type="button" className={btnSmall} disabled={busy || !text.trim() || out} onClick={go}>
+          <Sparkles className="h-3.5 w-3.5" aria-hidden /> {busy ? "Rewriting…" : "Magic Caption"}
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {out ? "Daily limit reached, try again tomorrow." : left !== null ? `${left} of 50 left today` : " "}
+      </p>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
 
 function Reconnect() {
   return <a href="/api/public/buffer/start" className={`${primary} mt-3`}>Reconnect Buffer</a>;
@@ -88,9 +140,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
       {channels?.status === "ok" && list.length > 0 && (
         <div className="mt-3 space-y-3">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
-          <p className={`text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>
-            {text.length}{limit ? ` / ${limit} characters${tightest ? ` (limit for ${tightest.name})` : ""}` : " characters"}
-          </p>
+          <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -228,6 +278,7 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
         <h2 className="text-sm uppercase tracking-widest text-muted-foreground">New idea</h2>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={input} aria-label="Idea title" maxLength={300} />
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Notes or draft text" className={input} aria-label="Idea text" />
+        <MagicBar text={text} setText={setText} limit={0} />
         <button type="submit" className={primary} disabled={busy || (!title.trim() && !text.trim())}>{busy ? "Saving…" : "Save idea"}</button>
         <Outcome res={out} />
       </form>

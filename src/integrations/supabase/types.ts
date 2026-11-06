@@ -41,6 +41,24 @@ export type Database = {
         }
         Relationships: []
       }
+      magic_caption_usage: {
+        Row: {
+          usage_date: string
+          user_id: string
+          uses: number
+        }
+        Insert: {
+          usage_date: string
+          user_id: string
+          uses?: number
+        }
+        Update: {
+          usage_date?: string
+          user_id?: string
+          uses?: number
+        }
+        Relationships: []
+      }
       oauth_states: {
         Row: {
           code_verifier: string
@@ -67,7 +85,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      magic_caption_left: { Args: { p_user_id: string }; Returns: number }
+      refund_magic_caption_use: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      try_magic_caption_use: { Args: { p_user_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
