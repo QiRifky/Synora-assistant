@@ -5,7 +5,93 @@ import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannels, type ChannelsResult } from "@/lib/buffer.functions";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 
+import { collectTrends, findTopics, type TrendItem, type Topic } from "@/lib/trends.functions";
+
 type Channel = { id: string; name: string; service: string };
+
+function Trends() {
+  const runCollect = useServerFn(collectTrends);
+  const runTopics = useServerFn(findTopics);
+  const [niche, setNiche] = useState("");
+  const [feeds, setFeeds] = useState(["", "", ""]);
+  const [items, setItems] = useState<TrendItem[]>([]);
+  const [failed, setFailed] = useState<string[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [busy, setBusy] = useState<"collect" | "topics" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
+
+  async function doCollect(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy("collect"); setError(null); setTopics([]); setItems([]); setFailed([]);
+    try {
+      const r = await runCollect({ data: { niche: niche.trim(), feeds: feeds.map((f) => f.trim()).filter(Boolean) } });
+      setItems(r.items); setFailed(r.failed);
+      if (!r.items.length) setError("No items found. Try a different niche or feed.");
+    } catch { setError("Couldn't collect trends. Check your niche and feed links."); }
+    setBusy(null);
+  }
+  async function doTopics() {
+    setBusy("topics"); setError(null);
+    try {
+      const r = await runTopics({ data: { niche: niche.trim(), items: items.map((i) => ({ title: i.title, link: i.link })) } });
+      if (r.ok) setTopics(r.topics); else setError(r.error);
+    } catch { setError("Couldn't find topics right now. Please try again."); }
+    setBusy(null);
+  }
+
+  return (
+    <section className="mt-8 border-t border-border pt-8">
+      <h2 className="text-sm uppercase tracking-widest text-muted-foreground">Discover trends</h2>
+      <form onSubmit={doCollect} className="mt-3 space-y-3">
+        <input required minLength={2} placeholder="e.g. AI tools for creators" value={niche} onChange={(e) => setNiche(e.target.value)} className={input} aria-label="Your niche" />
+        {feeds.map((f, i) => (
+          <input key={i} type="url" placeholder={`Optional RSS feed URL ${i + 1}`} value={f}
+            onChange={(e) => setFeeds(feeds.map((x, j) => (j === i ? e.target.value : x)))} className={input} aria-label={`RSS feed ${i + 1}`} />
+        ))}
+        <button type="submit" disabled={busy !== null || niche.trim().length < 2} className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          {busy === "collect" ? "Collecting trends…" : "Collect trends"}
+        </button>
+      </form>
+      {failed.length > 0 && (
+        <p className="mt-3 text-sm text-muted-foreground">Couldn't load: {failed.join(", ")}</p>
+      )}
+      {items.length > 0 && (
+        <>
+          <ul className="mt-4 max-h-96 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+            {items.map((it) => (
+              <li key={it.link} className="px-4 py-3">
+                <a href={it.link} target="_blank" rel="noreferrer noopener" className="text-sm text-foreground hover:underline">{it.title}</a>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {it.source}{it.date ? ` · ${new Date(it.date).toLocaleDateString()}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <button onClick={doTopics} disabled={busy !== null} className="mt-4 inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
+            {busy === "topics" ? "Finding topics…" : "Find potential topics"}
+          </button>
+        </>
+      )}
+      {topics.length > 0 && (
+        <ol className="mt-4 space-y-3">
+          {topics.map((t, i) => (
+            <li key={i} className="rounded-xl border border-border p-4">
+              <p className="font-display text-lg text-foreground">{i + 1}. {t.topic}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t.reason}</p>
+              <ul className="mt-2 space-y-1">
+                {t.links.map((l) => (
+                  <li key={l.link}><a href={l.link} target="_blank" rel="noreferrer noopener" className="text-xs text-primary hover:underline">{l.title}</a></li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+      )}
+      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    </section>
+  );
+}
 
 function ReconnectButton() {
   return (
@@ -155,6 +241,7 @@ function AppPage() {
         {meta.name && <h1 className="mt-3 font-display text-3xl text-foreground">{meta.name}</h1>}
         <p className="mt-3 font-display text-2xl text-foreground break-all">{email}</p>
         <Channels />
+        <Trends />
         <button
           onClick={signOut}
           className="mt-8 inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium text-foreground transition-colors hover:bg-muted"
