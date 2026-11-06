@@ -26,7 +26,7 @@ export const Route = createFileRoute("/api/public/buffer/start")({
         auth.searchParams.set("response_type", "code");
         auth.searchParams.set("client_id", clientId);
         auth.searchParams.set("redirect_uri", callbackUrl(request));
-        auth.searchParams.set("scope", "account:read offline_access");
+        auth.searchParams.set("scope", "account:read posts:read posts:write ideas:read ideas:write offline_access");
         auth.searchParams.set("code_challenge", challenge);
         auth.searchParams.set("code_challenge_method", "S256");
         auth.searchParams.set("state", state);
