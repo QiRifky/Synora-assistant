@@ -7,6 +7,7 @@ import {
 import { charLimit } from "@/lib/trends.functions";
 import { magicCaption } from "@/lib/magic.functions";
 import { Sparkles, Undo2 } from "lucide-react";
+import { MediaAttachments, type AttachedMedia } from "@/components/media-attachments";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -90,6 +91,9 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const [res, setRes] = useState<WriteResult | null>(null);
   const [lastAction, setLastAction] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [media, setMedia] = useState<AttachedMedia[]>([]);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [retainedPaths, setRetainedPaths] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadChannels({ data: {} }).then(setChannels).catch(() => setChannels({ status: "error" })); }, [loadChannels]);
   useEffect(() => { if (prefill) { setText(prefill.text); setIdeaId(prefill.ideaId); setRes(null); } }, [prefill]);
@@ -103,19 +107,27 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const dueDate = when ? new Date(when) : null;
   const dueValid = !!dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() > Date.now() + 60_000;
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const canSend = !!text.trim() && chosen.length > 0 && !over && !busy;
+  const canSend = !!text.trim() && chosen.length > 0 && !over && !busy && !mediaBusy;
 
   async function send(action: "draft" | "queue" | "schedule") {
+    if (!canSend || (action === "schedule" && !dueValid)) return;
     setBusy(action); setRes(null); setLastAction(action);
     try {
       const r = await create({ data: {
         channelIds: selected, text: text.trim(), action,
         ...(action === "schedule" && dueDate ? { dueAt: dueDate.toISOString() } : {}),
         ...(ideaId ? { ideaId } : {}),
+        media: media.map(({ path, type }) => ({ path, type })),
       } });
       setRes(r);
-      if (r.status === "ok" && r.results.every((x) => x.ok)) { setText(""); setIdeaId(undefined); setWhen(""); onDone(); }
-      else if (r.status === "ok") onDone();
+      if (r.status === "ok" && r.results.some((x) => x.ok)) {
+        setRetainedPaths((prev) => new Set([...prev, ...media.map((m) => m.path)]));
+        if (r.results.every((x) => x.ok)) {
+          for (const m of media) URL.revokeObjectURL(m.preview);
+          setMedia([]); setText(""); setIdeaId(undefined); setWhen("");
+        }
+        onDone();
+      }
     } catch { setRes({ status: "error" }); }
     setBusy(null);
   }
@@ -132,6 +144,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
         <div className="mt-3 space-y-3">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
+          <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm} retainedPaths={retainedPaths} />
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -171,6 +184,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
             <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border p-3 text-foreground">{text}</p>
             <p><span className="text-muted-foreground">Channels: </span>{chosen.map((c) => `${c.name} (${c.service})`).join(", ")}</p>
             <p><span className="text-muted-foreground">When: </span>{dueDate?.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })} ({tz})</p>
+            {media.length > 0 && <p><span className="text-muted-foreground">Media: </span>{media.map((m) => m.file.name).join(", ")}</p>}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -241,6 +255,8 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState<WriteResult | null>(null);
+  const [media, setMedia] = useState<AttachedMedia[]>([]);
+  const [mediaBusy, setMediaBusy] = useState(false);
 
   function refresh(force: boolean) {
     setLoading(true);
@@ -250,11 +266,12 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
+    if (busy || mediaBusy) return;
     setBusy(true); setOut(null);
     try {
-      const r = await create({ data: { title: title.trim(), text: text.trim() } });
+      const r = await create({ data: { title: title.trim(), text: text.trim(), media: media.map(({ path, type }) => ({ path, type })) } });
       setOut(r);
-      if (r.status === "ok" && r.results[0]?.ok) { setTitle(""); setText(""); refresh(true); }
+      if (r.status === "ok" && r.results[0]?.ok) { for (const m of media) URL.revokeObjectURL(m.preview); setMedia([]); setTitle(""); setText(""); refresh(true); }
     } catch { setOut({ status: "error" }); }
     setBusy(false);
   }
@@ -270,7 +287,8 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={input} aria-label="Idea title" maxLength={300} />
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Notes or draft text" className={input} aria-label="Idea text" />
         <MagicBar text={text} setText={setText} limit={0} />
-        <button type="submit" className={primary} disabled={busy || (!title.trim() && !text.trim())}>{busy ? "Saving…" : "Save idea"}</button>
+        <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={busy} imagesOnly />
+        <button type="submit" className={primary} disabled={busy || mediaBusy || (!title.trim() && !text.trim())}>{busy ? "Saving…" : "Save idea"}</button>
         <Outcome res={out} />
       </form>
       {!res && <div className="mt-6 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>}

@@ -34,3 +34,4 @@ use the editor.
 - Buffer tokens and PKCE state live only in service-role tables (`buffer_connections`, `oauth_states`) with RLS on and no client grants; never return or log them.
 - Users are keyed by Buffer account id; the callback issues a one-time magic-link token_hash that `/auth/complete` exchanges for a session.
 - Buffer reads go through `src/lib/buffer.functions.ts` with a ~60s per-user in-memory cache (force=true bypasses), because Buffer rate-limits API requests.
+- Media uploads use the owner-scoped `post-media` Cloud Storage bucket; shared browser validation and authenticated server verification protect Buffer attachment inputs, and successful saves retain source files because Buffer does not guarantee ingestion before returning.

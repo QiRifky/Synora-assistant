@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { charLimit } from "@/lib/trends.functions";
+import { mediaInput, ownsMedia, postAssets, MAX_MEDIA_BYTES, MEDIA_BUCKET, type MediaAttachment } from "@/lib/media";
 
 export type BufferChannel = { id: string; name: string; service: string; avatar: string | null };
 export type ChannelsResult =
@@ -168,6 +169,25 @@ export type WriteResult =
 
 const POST_RESULT = `__typename ... on PostActionSuccess { post { id } } ... on MutationError { message }`;
 
+async function resolveMedia(userId: string, attachments: MediaAttachment[], imagesOnly = false) {
+  if (!attachments.length) return [];
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: bucket } = await supabaseAdmin.storage.getBucket(MEDIA_BUCKET);
+  if (!bucket?.public) throw new Error("Public media storage is not enabled. Remove the attachments or ask your workspace owner to enable it.");
+  const resolved: { type: "image" | "video"; url: string }[] = [];
+  for (const attachment of attachments) {
+    if (!ownsMedia(attachment.path, userId) || (imagesOnly && attachment.type === "video")) throw new Error("Invalid media attachment.");
+    const { data: info, error } = await supabaseAdmin.storage.from(MEDIA_BUCKET).info(attachment.path);
+    const expected = attachment.path.endsWith(".mp4") ? "video" : "image";
+    if (error || !info || typeof info.size !== "number" || info.size > MAX_MEDIA_BYTES || info.size <= 0 || attachment.type !== expected) throw new Error("An attachment is missing, invalid or larger than 10 MB. Please remove it and upload again.");
+    const allowed = expected === "video" ? ["video/mp4"] : ["image/jpeg", "image/png", "image/webp"];
+    if (!info.contentType || !allowed.includes(info.contentType)) throw new Error("Only JPG, PNG, WebP images and MP4 video are supported.");
+    const url = `${import.meta.env['VITE_SUPABASE_URL']}/storage/v1/object/public/${MEDIA_BUCKET}/${attachment.path}`;
+    resolved.push({ type: attachment.type, url });
+  }
+  return resolved;
+}
+
 export const createBufferPosts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
@@ -176,6 +196,7 @@ export const createBufferPosts = createServerFn({ method: "POST" })
     action: z.enum(["draft", "queue", "schedule"]),
     dueAt: z.string().datetime().optional(),
     ideaId: z.string().max(100).optional(),
+    media: mediaInput,
   }).parse(d))
   .handler(async ({ data, context }): Promise<WriteResult> => {
     if (data.action === "schedule") {
@@ -194,11 +215,14 @@ export const createBufferPosts = createServerFn({ method: "POST" })
       }
     }
     const r = await guard(async () => {
+      let media;
+      try { media = await resolveMedia(context.userId, data.media); }
+      catch (e) { return { status: "error" as const, message: e instanceof Error ? e.message : "Couldn't validate the attachments." }; }
       const token = await getToken(context.userId);
       const results: ChannelOutcome[] = [];
       for (const channelId of data.channelIds) {
         const input: Record<string, unknown> = {
-          channelId, text: data.text, assets: [], schedulingType: "automatic", needsApproval: false,
+          channelId, text: data.text, assets: postAssets(media), schedulingType: "automatic", needsApproval: false,
           mode: data.action === "schedule" ? "customScheduled" : "addToQueue",
           saveToDraft: data.action === "draft",
         };
@@ -276,16 +300,19 @@ export const getBufferIdeas = createServerFn({ method: "POST" })
 
 export const createBufferIdea = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ title: z.string().trim().max(300), text: z.string().trim().max(5000) })
+  .inputValidator((d) => z.object({ title: z.string().trim().max(300), text: z.string().trim().max(5000), media: mediaInput })
     .refine((v) => v.title || v.text, "Add a title or text").parse(d))
   .handler(async ({ data, context }): Promise<WriteResult> => {
     const r = await guard(async () => {
+      let media;
+      try { media = await resolveMedia(context.userId, data.media, true); }
+      catch (e) { return { status: "error" as const, message: e instanceof Error ? e.message : "Couldn't validate the attachments." }; }
       const token = await getToken(context.userId);
       const [org] = await orgIds(token);
       if (!org) return { status: "error" as const, message: "No Buffer organization found." };
       const d = await gql(token, `mutation($input: CreateIdeaInput!) { createIdea(input: $input) {
         __typename ... on Idea { id } ... on IdeaResponse { idea { id } } ... on MutationError { message } } }`,
-        { input: { organizationId: org, content: { title: data.title || null, text: data.text || null } } });
+        { input: { organizationId: org, content: { title: data.title || null, text: data.text || null, media: media.map((m) => ({ url: m.url, type: "image" })) } } });
       const p = d?.createIdea;
       const ok = p?.__typename === "Idea" || p?.__typename === "IdeaResponse";
       return { status: "ok" as const, results: [{ channelId: "", ok, message: ok ? "Idea saved in Buffer." : p?.message ? `Buffer said: ${p.message}` : "Buffer couldn't save the idea." }] };
