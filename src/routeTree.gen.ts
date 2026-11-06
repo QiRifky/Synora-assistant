@@ -10,33 +10,115 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AuthCompleteRouteImport } from './routes/auth.complete'
+import { Route as ApiPublicBufferCallbackRouteImport } from './routes/api/public/buffer/callback'
+import { Route as ApiPublicBufferStartRouteImport } from './routes/api/public/buffer/start'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCompleteRoute = AuthCompleteRouteImport.update({
+  id: '/auth/complete',
+  path: '/auth/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBufferCallbackRoute = ApiPublicBufferCallbackRouteImport.update({
+  id: '/api/public/buffer/callback',
+  path: '/api/public/buffer/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBufferStartRoute = ApiPublicBufferStartRouteImport.update({
+  id: '/api/public/buffer/start',
+  path: '/api/public/buffer/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/auth/complete': typeof AuthCompleteRoute
+  '/api/public/buffer/callback': typeof ApiPublicBufferCallbackRoute
+  '/api/public/buffer/start': typeof ApiPublicBufferStartRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/auth/complete': typeof AuthCompleteRoute
+  '/api/public/buffer/callback': typeof ApiPublicBufferCallbackRoute
+  '/api/public/buffer/start': typeof ApiPublicBufferStartRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/auth/complete': typeof AuthCompleteRoute
+  '/api/public/buffer/callback': typeof ApiPublicBufferCallbackRoute
+  '/api/public/buffer/start': typeof ApiPublicBufferStartRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/privacy'
+    | '/terms'
+    | '/auth/complete'
+    | '/api/public/buffer/callback'
+    | '/api/public/buffer/start'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/app'
+    | '/privacy'
+    | '/terms'
+    | '/auth/complete'
+    | '/api/public/buffer/callback'
+    | '/api/public/buffer/start'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/privacy'
+    | '/terms'
+    | '/auth/complete'
+    | '/api/public/buffer/callback'
+    | '/api/public/buffer/start'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
+  AuthCompleteRoute: typeof AuthCompleteRoute
+  ApiPublicBufferCallbackRoute: typeof ApiPublicBufferCallbackRoute
+  ApiPublicBufferStartRoute: typeof ApiPublicBufferStartRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +130,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/complete': {
+      id: '/auth/complete'
+      path: '/auth/complete'
+      fullPath: '/auth/complete'
+      preLoaderRoute: typeof AuthCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/buffer/callback': {
+      id: '/api/public/buffer/callback'
+      path: '/api/public/buffer/callback'
+      fullPath: '/api/public/buffer/callback'
+      preLoaderRoute: typeof ApiPublicBufferCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/buffer/start': {
+      id: '/api/public/buffer/start'
+      path: '/api/public/buffer/start'
+      fullPath: '/api/public/buffer/start'
+      preLoaderRoute: typeof ApiPublicBufferStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
+  AuthCompleteRoute: AuthCompleteRoute,
+  ApiPublicBufferCallbackRoute: ApiPublicBufferCallbackRoute,
+  ApiPublicBufferStartRoute: ApiPublicBufferStartRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
