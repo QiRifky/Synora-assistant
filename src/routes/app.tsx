@@ -3,6 +3,75 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannels, type ChannelsResult } from "@/lib/buffer.functions";
+import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
+
+type Channel = { id: string; name: string; service: string };
+
+function ReconnectButton() {
+  return (
+    <a href="/api/public/buffer/start" className="mt-3 inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground">
+      Reconnect Buffer
+    </a>
+  );
+}
+
+function Composer({ channels }: { channels: Channel[] }) {
+  const runImport = useServerFn(importArticle);
+  const runSave = useServerFn(saveBufferDraft);
+  const [url, setUrl] = useState("");
+  const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState<"import" | "save" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reconnect, setReconnect] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const channel = channels.find((c) => c.id === channelId);
+
+  async function doImport(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy("import"); setError(null); setSaved(false);
+    try {
+      const r = await runImport({ data: { url: url.trim(), service: channel?.service ?? "" } });
+      if (r.ok) setDraft(r.draft); else setError(r.error);
+    } catch { setError("Please enter a valid article link."); }
+    setBusy(null);
+  }
+  async function doSave() {
+    setBusy("save"); setError(null); setSaved(false);
+    try {
+      const r = await runSave({ data: { channelId, text: draft } });
+      if (r.ok) setSaved(true); else { setError(r.error); setReconnect(!!r.reconnect); }
+    } catch { setError("Couldn't save the draft. Please try again."); }
+    setBusy(null);
+  }
+
+  const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
+  return (
+    <section className="mt-8 border-t border-border pt-8">
+      <h2 className="text-sm uppercase tracking-widest text-muted-foreground">Turn an article into a post</h2>
+      <form onSubmit={doImport} className="mt-3 space-y-3">
+        <input type="url" required placeholder="https://example.com/article" value={url} onChange={(e) => setUrl(e.target.value)} className={input} aria-label="Article URL" />
+        <select value={channelId} onChange={(e) => setChannelId(e.target.value)} className={input} aria-label="Channel">
+          {channels.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.service})</option>)}
+        </select>
+        <button type="submit" disabled={busy !== null || !url} className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          {busy === "import" ? "Reading article and writing draft…" : "Import article"}
+        </button>
+      </form>
+      {draft && (
+        <div className="mt-5 space-y-3">
+          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setSaved(false); }} rows={7} className={input} aria-label="Post draft" />
+          <button onClick={doSave} disabled={busy !== null || !draft.trim() || !channelId} className="inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
+            {busy === "save" ? "Saving…" : "Save as draft in Buffer"}
+          </button>
+        </div>
+      )}
+      {saved && <p className="mt-3 text-sm text-foreground">Saved as a draft in Buffer{channel ? ` for ${channel.name}` : ""}.</p>}
+      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {reconnect && <ReconnectButton />}
+    </section>
+  );
+}
 
 function Channels() {
   const fetchChannels = useServerFn(getBufferChannels);
@@ -29,6 +98,7 @@ function Channels() {
       {res?.status === "error" && (
         <p className="mt-3 text-sm text-muted-foreground">Couldn't load your channels right now. Please refresh.</p>
       )}
+      {res?.status === "ok" && res.channels.length > 0 && <Composer channels={res.channels} />}
       {res?.status === "ok" &&
         (res.channels.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No channels connected in Buffer yet.</p>
