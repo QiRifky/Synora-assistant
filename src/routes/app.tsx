@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannels, getBufferPosts, getBufferSummary, type PostStatus } from "@/lib/buffer.functions";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, RefreshCw, LogOut } from "lucide-react";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
@@ -367,9 +368,9 @@ function ChannelsView() {
   );
 }
 
-function PostList({ status }: { status: PostStatus }) {
+function PostList({ status, version }: { status: PostStatus; version: number }) {
   const fn = useServerFn(getBufferPosts);
-  const { res, busy, refresh } = useLoad((force) => fn({ data: { status, force } }), [status]);
+  const { res, busy, refresh } = useLoad((force) => fn({ data: { status, force: version > 0 } }), [status, version]);
   const label = { draft: "drafts", scheduled: "scheduled posts", sent: "sent posts" }[status];
   return (
     <>
@@ -392,6 +393,7 @@ function PostList({ status }: { status: PostStatus }) {
                 <p className="mt-2 text-xs text-muted-foreground">
                   {p.channelName} · {p.service}{date ? ` · ${prefix} ${new Date(date).toLocaleString()}` : ""}
                 </p>
+                {status === "draft" && <DraftActions id={p.id} text={p.text} onChanged={refresh} />}
               </li>
             );
           })}
@@ -402,19 +404,21 @@ function PostList({ status }: { status: PostStatus }) {
   );
 }
 
-function PostsView() {
+function PostsView({ prefill }: { prefill: Prefill | null }) {
+  const [version, setVersion] = useState(0);
   return (
     <>
       <PageHeader title="Posts" />
-      <Tabs defaultValue="draft" className="mt-6">
+      <div className="mt-6"><NewPost prefill={prefill} onDone={() => setVersion((v) => v + 1)} /></div>
+      <Tabs defaultValue="draft" className="mt-8">
         <TabsList>
           <TabsTrigger value="draft">Drafts</TabsTrigger>
           <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
           <TabsTrigger value="sent">Sent</TabsTrigger>
         </TabsList>
-        <TabsContent value="draft"><PostList status="draft" /></TabsContent>
-        <TabsContent value="scheduled"><PostList status="scheduled" /></TabsContent>
-        <TabsContent value="sent"><PostList status="sent" /></TabsContent>
+        <TabsContent value="draft"><PostList status="draft" version={version} /></TabsContent>
+        <TabsContent value="scheduled"><PostList status="scheduled" version={version} /></TabsContent>
+        <TabsContent value="sent"><PostList status="sent" version={version} /></TabsContent>
       </Tabs>
     </>
   );
@@ -478,6 +482,7 @@ function AppPage() {
   const meta = (user.user_metadata ?? {}) as { buffer_email?: string | null; name?: string };
   const email = meta.buffer_email || "no email provided";
   const [view, setView] = useState<View>("overview");
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -496,13 +501,8 @@ function AppPage() {
           <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
             {view === "overview" && <OverviewView />}
             {view === "channels" && <ChannelsView />}
-            {view === "posts" && <PostsView />}
-            {view === "ideas" && (
-              <>
-                <PageHeader title="Ideas" />
-                <div className="mt-6 rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">Coming next</div>
-              </>
-            )}
+            {view === "posts" && <PostsView prefill={prefill} />}
+            {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
             {view === "discover" && <DiscoverView />}
           </main>
         </div>

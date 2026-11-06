@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { charLimit } from "@/lib/trends.functions";
 
 export type BufferChannel = { id: string; name: string; service: string; avatar: string | null };
 export type ChannelsResult =
@@ -151,4 +152,144 @@ export const getBufferSummary = createServerFn({ method: "POST" })
       counts[s] = { count: r.posts.length, hasMore: r.hasMore };
     }
     return { status: "ok", channels: ch.channels.length, counts };
+  });
+
+// ---------- Writes (never publish automatically; scheduling only on explicit user action) ----------
+
+function clearCache(userId: string) {
+  for (const k of cache.keys()) if (k.startsWith(`${userId}:`)) cache.delete(k);
+}
+
+export type ChannelOutcome = { channelId: string; ok: boolean; message: string };
+export type WriteResult =
+  | { status: "ok"; results: ChannelOutcome[] }
+  | { status: "reconnect" }
+  | { status: "error"; message?: string };
+
+const POST_RESULT = `__typename ... on PostActionSuccess { post { id } } ... on MutationError { message }`;
+
+export const createBufferPosts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    channelIds: z.array(z.string().min(1).max(100)).min(1).max(20),
+    text: z.string().trim().min(1).max(5000),
+    action: z.enum(["draft", "queue", "schedule"]),
+    dueAt: z.string().datetime().optional(),
+    ideaId: z.string().max(100).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }): Promise<WriteResult> => {
+    if (data.action === "schedule") {
+      if (!data.dueAt || new Date(data.dueAt).getTime() < Date.now() + 60_000) {
+        return { status: "error", message: "Pick a date and time at least a minute in the future." };
+      }
+    }
+    const ch = await loadChannels(context.userId, false);
+    if (ch.status !== "ok") return ch;
+    const byId = new Map(ch.channels.map((c) => [c.id, c]));
+    for (const id of data.channelIds) {
+      const c = byId.get(id);
+      if (!c) return { status: "error", message: "One of the selected channels wasn't found. Please refresh." };
+      if (data.text.length > charLimit(c.service)) {
+        return { status: "error", message: `Too long for ${c.name} (max ${charLimit(c.service)} characters).` };
+      }
+    }
+    const r = await guard(async () => {
+      const token = await getToken(context.userId);
+      const results: ChannelOutcome[] = [];
+      for (const channelId of data.channelIds) {
+        const input: Record<string, unknown> = {
+          channelId, text: data.text, assets: [], schedulingType: "automatic", needsApproval: false,
+          mode: data.action === "schedule" ? "customScheduled" : "addToQueue",
+          saveToDraft: data.action === "draft",
+        };
+        if (data.action === "schedule") input["dueAt"] = data.dueAt;
+        if (data.ideaId) input["ideaId"] = data.ideaId;
+        try {
+          const d = await gql(token, `mutation($input: CreatePostInput!) { createPost(input: $input) { ${POST_RESULT} } }`, { input });
+          const p = d?.createPost;
+          results.push(p?.__typename === "PostActionSuccess"
+            ? { channelId, ok: true, message: "Done" }
+            : { channelId, ok: false, message: p?.message ? `Buffer said: ${p.message}` : "Buffer rejected this post." });
+        } catch (e) {
+          if (e instanceof Reconnect) throw e;
+          results.push({ channelId, ok: false, message: "Buffer couldn't process this post." });
+        }
+      }
+      return { status: "ok" as const, results };
+    });
+    clearCache(context.userId);
+    return r;
+  });
+
+export const editBufferDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(100), text: z.string().trim().min(1).max(5000) }).parse(d))
+  .handler(async ({ data, context }): Promise<WriteResult> => {
+    const r = await guard(async () => {
+      const token = await getToken(context.userId);
+      // Keep it a draft: saveToDraft true, no mode/dueAt change.
+      const d = await gql(token, `mutation($input: EditPostInput!) { editPost(input: $input) { ${POST_RESULT} } }`,
+        { input: { id: data.id, text: data.text, saveToDraft: true } });
+      const p = d?.editPost;
+      const ok = p?.__typename === "PostActionSuccess";
+      return { status: "ok" as const, results: [{ channelId: "", ok, message: ok ? "Draft updated." : p?.message ? `Buffer said: ${p.message}` : "Buffer couldn't update the draft." }] };
+    });
+    clearCache(context.userId);
+    return r;
+  });
+
+export const deleteBufferDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().min(1).max(100) }).parse(d))
+  .handler(async ({ data, context }): Promise<WriteResult> => {
+    const r = await guard(async () => {
+      const token = await getToken(context.userId);
+      const d = await gql(token, `mutation($input: DeletePostInput!) { deletePost(input: $input) {
+        __typename ... on DeletePostSuccess { id } ... on MutationError { message } } }`, { input: { id: data.id } });
+      const p = d?.deletePost;
+      const ok = p?.__typename === "DeletePostSuccess";
+      return { status: "ok" as const, results: [{ channelId: "", ok, message: ok ? "Draft deleted." : p?.message ? `Buffer said: ${p.message}` : "Buffer couldn't delete the draft." }] };
+    });
+    clearCache(context.userId);
+    return r;
+  });
+
+export type BufferIdea = { id: string; title: string; text: string; createdAt: number | null };
+export type IdeasResult = { status: "ok"; ideas: BufferIdea[] } | { status: "reconnect" } | { status: "error" };
+
+export const getBufferIdeas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(forceInput)
+  .handler(({ data, context }) => cached(`${context.userId}:ideas`, !!data?.force, () => guard(async () => {
+    const token = await getToken(context.userId);
+    const ideas: BufferIdea[] = [];
+    for (const org of await orgIds(token)) {
+      const d = await gql(token, `query($input: IdeasInput!, $first: Int) { ideas(input: $input, first: $first) {
+        edges { node { id createdAt content { title text } } } } }`, { first: 50, input: { organizationId: org } });
+      for (const e of d?.ideas?.edges ?? []) {
+        ideas.push({ id: String(e.node.id), title: e.node.content?.title ?? "", text: e.node.content?.text ?? "", createdAt: e.node.createdAt ?? null });
+      }
+    }
+    ideas.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return { status: "ok" as const, ideas };
+  }) as Promise<IdeasResult>));
+
+export const createBufferIdea = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ title: z.string().trim().max(300), text: z.string().trim().max(5000) })
+    .refine((v) => v.title || v.text, "Add a title or text").parse(d))
+  .handler(async ({ data, context }): Promise<WriteResult> => {
+    const r = await guard(async () => {
+      const token = await getToken(context.userId);
+      const [org] = await orgIds(token);
+      if (!org) return { status: "error" as const, message: "No Buffer organization found." };
+      const d = await gql(token, `mutation($input: CreateIdeaInput!) { createIdea(input: $input) {
+        __typename ... on Idea { id } ... on IdeaResponse { idea { id } } ... on MutationError { message } } }`,
+        { input: { organizationId: org, content: { title: data.title || null, text: data.text || null } } });
+      const p = d?.createIdea;
+      const ok = p?.__typename === "Idea" || p?.__typename === "IdeaResponse";
+      return { status: "ok" as const, results: [{ channelId: "", ok, message: ok ? "Idea saved in Buffer." : p?.message ? `Buffer said: ${p.message}` : "Buffer couldn't save the idea." }] };
+    });
+    clearCache(context.userId);
+    return r;
   });

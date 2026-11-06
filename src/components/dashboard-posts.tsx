@@ -1,0 +1,251 @@
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  createBufferPosts, editBufferDraft, deleteBufferDraft, getBufferChannels, getBufferIdeas, createBufferIdea,
+  type BufferChannel, type ChannelsResult, type IdeasResult, type WriteResult,
+} from "@/lib/buffer.functions";
+import { charLimit } from "@/lib/trends.functions";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+export type Prefill = { text: string; ideaId?: string | undefined; key: number };
+
+const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
+const btn = "inline-flex h-10 items-center rounded-full border border-border px-5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50";
+const primary = "inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:opacity-50";
+
+function Reconnect() {
+  return <a href="/api/public/buffer/start" className={`${primary} mt-3`}>Reconnect Buffer</a>;
+}
+
+function Outcome({ res, names, success }: { res: WriteResult | null; names?: Map<string, string>; success?: string }) {
+  if (!res) return null;
+  if (res.status === "reconnect") return <div className="mt-3"><p className="text-sm text-muted-foreground">Your Buffer connection has expired.</p><Reconnect /></div>;
+  if (res.status === "error") return <p role="alert" className="mt-3 text-sm text-destructive">{res.message ?? "Couldn't reach Buffer. Please try again."}</p>;
+  return (
+    <ul className="mt-3 space-y-1">
+      {res.results.map((r, i) => (
+        <li key={i} role={r.ok ? "status" : "alert"} className={`text-sm ${r.ok ? "text-foreground" : "text-destructive"}`}>
+          {names?.get(r.channelId) ? `${names.get(r.channelId)}: ` : ""}{r.ok ? (success ?? r.message) : r.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: () => void }) {
+  const loadChannels = useServerFn(getBufferChannels);
+  const create = useServerFn(createBufferPosts);
+  const [channels, setChannels] = useState<ChannelsResult | null>(null);
+  const [text, setText] = useState(prefill?.text ?? "");
+  const [ideaId, setIdeaId] = useState(prefill?.ideaId);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [when, setWhen] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [res, setRes] = useState<WriteResult | null>(null);
+  const [lastAction, setLastAction] = useState("");
+  const [confirm, setConfirm] = useState(false);
+
+  useEffect(() => { loadChannels({ data: {} }).then(setChannels).catch(() => setChannels({ status: "error" })); }, [loadChannels]);
+  useEffect(() => { if (prefill) { setText(prefill.text); setIdeaId(prefill.ideaId); setRes(null); } }, [prefill]);
+
+  const list: BufferChannel[] = channels?.status === "ok" ? channels.channels : [];
+  const names = useMemo(() => new Map(list.map((c) => [c.id, c.name])), [list]);
+  const chosen = list.filter((c) => selected.includes(c.id));
+  const limit = chosen.length ? Math.min(...chosen.map((c) => charLimit(c.service))) : 0;
+  const tightest = chosen.find((c) => charLimit(c.service) === limit);
+  const over = limit > 0 && text.length > limit;
+  const dueDate = when ? new Date(when) : null;
+  const dueValid = !!dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() > Date.now() + 60_000;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const canSend = !!text.trim() && chosen.length > 0 && !over && !busy;
+
+  async function send(action: "draft" | "queue" | "schedule") {
+    setBusy(action); setRes(null); setLastAction(action);
+    try {
+      const r = await create({ data: {
+        channelIds: selected, text: text.trim(), action,
+        ...(action === "schedule" && dueDate ? { dueAt: dueDate.toISOString() } : {}),
+        ...(ideaId ? { ideaId } : {}),
+      } });
+      setRes(r);
+      if (r.status === "ok" && r.results.every((x) => x.ok)) { setText(""); setIdeaId(undefined); setWhen(""); onDone(); }
+      else if (r.status === "ok") onDone();
+    } catch { setRes({ status: "error" }); }
+    setBusy(null);
+  }
+  const successMsg = { draft: "Saved as a draft in Buffer.", queue: "Added to your Buffer queue.", schedule: `Scheduled for ${dueDate?.toLocaleString() ?? ""}.` }[lastAction as "draft"];
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <h2 className="text-sm uppercase tracking-widest text-muted-foreground">New post</h2>
+      {channels === null && <div className="mt-3 h-24 animate-pulse rounded-xl bg-muted" />}
+      {channels?.status === "reconnect" && <Reconnect />}
+      {channels?.status === "error" && <p className="mt-3 text-sm text-destructive">Couldn't load your channels. Please refresh.</p>}
+      {channels?.status === "ok" && list.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Connect a channel in Buffer first.</p>}
+      {channels?.status === "ok" && list.length > 0 && (
+        <div className="mt-3 space-y-3">
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
+          <p className={`text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>
+            {text.length}{limit ? ` / ${limit} characters${tightest ? ` (limit for ${tightest.name})` : ""}` : " characters"}
+          </p>
+          <fieldset>
+            <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {list.map((c) => {
+                const on = selected.includes(c.id);
+                return (
+                  <label key={c.id} className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${on ? "border-primary bg-muted text-foreground" : "border-border text-muted-foreground"}`}>
+                    <input type="checkbox" className="accent-primary" checked={on}
+                      onChange={() => setSelected(on ? selected.filter((x) => x !== c.id) : [...selected, c.id])} />
+                    {c.name} <span className="text-xs uppercase">{c.service}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+          <div className="flex flex-wrap items-end gap-2">
+            <button className={btn} disabled={!canSend} onClick={() => send("draft")}>{busy === "draft" ? "Saving…" : "Save as draft"}</button>
+            <button className={btn} disabled={!canSend} onClick={() => send("queue")}>{busy === "queue" ? "Adding…" : "Add to queue"}</button>
+            <label className="text-xs text-muted-foreground">
+              Date and time ({tz})
+              <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={`${input} mt-1 h-10 py-0`} aria-label="Schedule date and time" />
+            </label>
+            <button className={primary} disabled={!canSend || !dueValid} onClick={() => setConfirm(true)}>{busy === "schedule" ? "Scheduling…" : "Schedule"}</button>
+          </div>
+          {when && !dueValid && <p className="text-xs text-destructive">Pick a time at least a minute from now.</p>}
+          {ideaId && <p className="text-xs text-muted-foreground">Started from a Buffer idea.</p>}
+        </div>
+      )}
+      <Outcome res={res} names={names} success={successMsg} />
+      <AlertDialog open={confirm} onOpenChange={setConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Schedule this post?</AlertDialogTitle>
+            <AlertDialogDescription>Buffer will publish it automatically at the time below.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border p-3 text-foreground">{text}</p>
+            <p><span className="text-muted-foreground">Channels: </span>{chosen.map((c) => `${c.name} (${c.service})`).join(", ")}</p>
+            <p><span className="text-muted-foreground">When: </span>{dueDate?.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })} ({tz})</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => send("schedule")}>Yes, schedule</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
+}
+
+export function DraftActions({ id, text, onChanged }: { id: string; text: string; onChanged: () => void }) {
+  const edit = useServerFn(editBufferDraft);
+  const del = useServerFn(deleteBufferDraft);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(text);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [res, setRes] = useState<WriteResult | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  async function run(kind: "save" | "delete") {
+    setBusy(kind); setRes(null);
+    try {
+      const r = kind === "save" ? await edit({ data: { id, text: value.trim() } }) : await del({ data: { id } });
+      setRes(r);
+      if (r.status === "ok" && r.results[0]?.ok) { setEditing(false); onChanged(); }
+    } catch { setRes({ status: "error" }); }
+    setBusy(null);
+  }
+
+  return (
+    <div className="mt-3">
+      {editing && <textarea value={value} onChange={(e) => setValue(e.target.value)} rows={5} className={input} aria-label="Edit draft" />}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {editing ? (
+          <>
+            <button className={btn} disabled={!!busy || !value.trim()} onClick={() => run("save")}>{busy === "save" ? "Saving…" : "Save changes"}</button>
+            <button className={btn} disabled={!!busy} onClick={() => { setEditing(false); setValue(text); }}>Cancel</button>
+          </>
+        ) : (
+          <button className={btn} disabled={!!busy} onClick={() => setEditing(true)}>Edit</button>
+        )}
+        <button className={btn} disabled={!!busy} onClick={() => setConfirmDel(true)}>{busy === "delete" ? "Deleting…" : "Delete"}</button>
+      </div>
+      <Outcome res={res} />
+      <AlertDialog open={confirmDel} onOpenChange={setConfirmDel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+            <AlertDialogDescription>It will be removed from Buffer. This can't be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => run("delete")}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => void }) {
+  const load = useServerFn(getBufferIdeas);
+  const create = useServerFn(createBufferIdea);
+  const [res, setRes] = useState<IdeasResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState<WriteResult | null>(null);
+
+  function refresh(force: boolean) {
+    setLoading(true);
+    load({ data: { force } }).then(setRes).catch(() => setRes({ status: "error" })).finally(() => setLoading(false));
+  }
+  useEffect(() => { refresh(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setOut(null);
+    try {
+      const r = await create({ data: { title: title.trim(), text: text.trim() } });
+      setOut(r);
+      if (r.status === "ok" && r.results[0]?.ok) { setTitle(""); setText(""); refresh(true); }
+    } catch { setOut({ status: "error" }); }
+    setBusy(false);
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-3xl text-foreground">Ideas</h1>
+        <button onClick={() => refresh(true)} disabled={loading} className={btn}>{loading ? "Refreshing…" : "Refresh"}</button>
+      </div>
+      <form onSubmit={add} className="mt-6 space-y-3 rounded-2xl border border-border bg-card p-5">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground">New idea</h2>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={input} aria-label="Idea title" maxLength={300} />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Notes or draft text" className={input} aria-label="Idea text" />
+        <button type="submit" className={primary} disabled={busy || (!title.trim() && !text.trim())}>{busy ? "Saving…" : "Save idea"}</button>
+        <Outcome res={out} />
+      </form>
+      {!res && <div className="mt-6 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>}
+      {res?.status === "reconnect" && <div className="mt-6"><p className="text-sm text-muted-foreground">Your Buffer connection has expired.</p><Reconnect /></div>}
+      {res?.status === "error" && <p role="alert" className="mt-6 text-sm text-destructive">Couldn't load your ideas from Buffer. Try Refresh in a moment.</p>}
+      {res?.status === "ok" && res.ideas.length === 0 && <p className="mt-6 text-sm text-muted-foreground">No ideas in Buffer yet. Add your first one above.</p>}
+      {res?.status === "ok" && res.ideas.length > 0 && (
+        <ul className="mt-6 space-y-3">
+          {res.ideas.map((i) => (
+            <li key={i.id} className="rounded-2xl border border-border bg-card p-4">
+              {i.title && <p className="font-display text-lg text-foreground">{i.title}</p>}
+              {i.text && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground line-clamp-4">{i.text}</p>}
+              <button className={`${btn} mt-3`} onClick={() => onUse([i.title, i.text].filter(Boolean).join("\n\n"), i.id)}>Turn idea into draft</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
