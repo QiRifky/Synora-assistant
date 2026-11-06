@@ -170,3 +170,97 @@ export const findTopics = createServerFn({ method: "POST" })
       return { ok: false, error: "Couldn't find topics right now. Please try again." };
     }
   });
+
+const LIMITS: Record<string, number> = {
+  twitter: 280, x: 280, bluesky: 300, threads: 500, mastodon: 500,
+  linkedin: 3000, instagram: 2200, facebook: 5000, tiktok: 2200, pinterest: 500, youtube: 5000,
+};
+export function charLimit(service: string) {
+  return LIMITS[service.toLowerCase()] ?? 2000;
+}
+export function fitToLimit(text: string, limit: number) {
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit - 1);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > limit * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "…";
+}
+
+async function aiText(system: string, prompt: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const apiKey = process.env["LOVABLE_API_KEY"];
+  if (!apiKey) return { ok: false, error: "AI isn't set up yet." };
+  const { createOpenAI } = await import("@ai-sdk/openai");
+  const { streamText } = await import("ai");
+  const openai = createOpenAI({
+    baseURL: "https://ai.gateway.lovable.dev/v1",
+    apiKey,
+    headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+  });
+  try {
+    const result = streamText({
+      model: openai.responses("openai/gpt-6-astra"),
+      system, prompt,
+      providerOptions: {
+        openai: {
+          forceReasoning: true, reasoningEffort: "low", reasoningSummary: "auto",
+          store: false, include: ["reasoning.encrypted_content"],
+        },
+      },
+    });
+    const text = (await result.text).trim();
+    if (!text) return { ok: false, error: "The AI returned nothing. Please try again." };
+    return { ok: true, text };
+  } catch (e: any) {
+    const status = e?.statusCode ?? e?.status;
+    console.error("ai call failed", status);
+    if (status === 429) return { ok: false, error: "Too many requests right now. Please wait a moment and try again." };
+    if (status === 402) return { ok: false, error: "AI credits have run out. Add credits to continue." };
+    return { ok: false, error: "Couldn't reach the AI right now. Please try again." };
+  }
+}
+
+const topicInput = z.object({
+  niche: z.string().trim().min(2).max(120),
+  topic: z.string().max(300),
+  reason: z.string().max(600),
+  links: z.array(z.object({ title: z.string().max(500), link: z.string().url().max(2000) })).max(5),
+});
+
+export type Idea = { hook: string; angle: string };
+
+export const generateIdeas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => topicInput.parse(d))
+  .handler(async ({ data }): Promise<{ ok: true; ideas: Idea[] } | { ok: false; error: string }> => {
+    const r = await aiText(
+      'You suggest social media post ideas. Reply with JSON only: {"ideas":[{"hook":string,"angle":string}]} with exactly 5 ideas. hook = a short attention-grabbing opening line; angle = one sentence on the perspective of the post.',
+      `Niche: ${data.niche}\nTopic: ${data.topic}\nWhy it matters: ${data.reason}\nRelated headlines:\n${data.links.map((l) => `- ${l.title}`).join("\n")}`,
+    );
+    if (!r.ok) return r;
+    try {
+      const json = r.text.slice(r.text.indexOf("{"), r.text.lastIndexOf("}") + 1);
+      const p = z.object({ ideas: z.array(z.object({ hook: z.string(), angle: z.string() })) }).parse(JSON.parse(json));
+      return { ok: true, ideas: p.ideas.slice(0, 5) };
+    } catch {
+      return { ok: false, error: "Couldn't read the ideas. Please try again." };
+    }
+  });
+
+export const createTopicDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => topicInput.extend({ service: z.string().max(50) }).parse(d))
+  .handler(async ({ data }): Promise<{ ok: true; draft: string; limit: number } | { ok: false; error: string }> => {
+    const limit = charLimit(data.service);
+    const link = data.links[0]?.link;
+    const r = await aiText(
+      `You write one engaging social media post. Output only the post text, no quotes or preamble. It MUST be at most ${limit} characters in total, including any link. ${link ? `Include this source link at the end if it fits within the limit: ${link}` : ""}`,
+      `Platform: ${data.service || "general"}\nNiche: ${data.niche}\nTopic: ${data.topic}\nWhy it matters: ${data.reason}`,
+    );
+    if (!r.ok) return r;
+    let text = r.text;
+    if (text.length > limit && link && text.includes(link)) {
+      const without = text.replace(link, "").trim();
+      const withLink = fitToLimit(without, limit - link.length - 1) + " " + link;
+      text = withLink.length <= limit ? withLink : fitToLimit(without, limit);
+    }
+    return { ok: true, draft: fitToLimit(text, limit), limit };
+  });

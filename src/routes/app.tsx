@@ -5,11 +5,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannels, type ChannelsResult } from "@/lib/buffer.functions";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 
-import { collectTrends, findTopics, type TrendItem, type Topic } from "@/lib/trends.functions";
+import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
 
 type Channel = { id: string; name: string; service: string };
 
-function Trends() {
+function Trends({ channel }: { channel?: Channel | undefined }) {
   const runCollect = useServerFn(collectTrends);
   const runTopics = useServerFn(findTopics);
   const [niche, setNiche] = useState("");
@@ -84,6 +84,7 @@ function Trends() {
                   <li key={l.link}><a href={l.link} target="_blank" rel="noreferrer noopener" className="text-xs text-primary hover:underline">{l.title}</a></li>
                 ))}
               </ul>
+              <TopicTools niche={niche.trim()} topic={t} channel={channel} />
             </li>
           ))}
         </ol>
@@ -101,11 +102,83 @@ function ReconnectButton() {
   );
 }
 
-function Composer({ channels }: { channels: Channel[] }) {
+function TopicTools({ niche, topic, channel }: { niche: string; topic: Topic; channel?: Channel | undefined }) {
+  const runIdeas = useServerFn(generateIdeas);
+  const runDraft = useServerFn(createTopicDraft);
+  const runSave = useServerFn(saveBufferDraft);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [draft, setDraft] = useState("");
+  const [limit, setLimit] = useState(0);
+  const [busy, setBusy] = useState<"ideas" | "draft" | "save" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reconnect, setReconnect] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const payload = { niche, topic: topic.topic, reason: topic.reason, links: topic.links };
+  const btn = "inline-flex h-9 items-center rounded-full border border-border px-4 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50";
+
+  async function doIdeas() {
+    setBusy("ideas"); setError(null);
+    try { const r = await runIdeas({ data: payload }); if (r.ok) setIdeas(r.ideas); else setError(r.error); }
+    catch { setError("Couldn't get content ideas. Please try again."); }
+    setBusy(null);
+  }
+  async function doDraft() {
+    if (!channel) return;
+    setBusy("draft"); setError(null); setSaved(null);
+    try {
+      const r = await runDraft({ data: { ...payload, service: channel.service } });
+      if (r.ok) { setDraft(r.draft); setLimit(r.limit); } else setError(r.error);
+    } catch { setError("Couldn't create a draft. Please try again."); }
+    setBusy(null);
+  }
+  async function doSave() {
+    if (!channel) return;
+    setBusy("save"); setError(null); setSaved(null); setReconnect(false);
+    try {
+      const r = await runSave({ data: { channelId: channel.id, text: draft } });
+      if (r.ok) setSaved(`Saved as a draft in Buffer for ${channel.name}. Nothing was published or scheduled.`);
+      else { setError(r.error); setReconnect(!!r.reconnect); }
+    } catch { setError("Couldn't save the draft. Please try again."); }
+    setBusy(null);
+  }
+  const over = limit > 0 && draft.length > limit;
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={doIdeas} disabled={busy !== null} className={btn}>{busy === "ideas" ? "Thinking of ideas…" : "Content ideas"}</button>
+        <button onClick={doDraft} disabled={busy !== null || !channel} className={btn}>
+          {busy === "draft" ? "Writing draft…" : channel ? `Create draft for ${channel.name}` : "Create draft (no channel)"}
+        </button>
+      </div>
+      {ideas.length > 0 && (
+        <ol className="mt-3 list-decimal space-y-2 pl-5">
+          {ideas.map((d, i) => (
+            <li key={i} className="text-sm"><span className="text-foreground">{d.hook}</span><span className="block text-xs text-muted-foreground">{d.angle}</span></li>
+          ))}
+        </ol>
+      )}
+      {draft && (
+        <div className="mt-3 space-y-2">
+          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setSaved(null); }} rows={6}
+            className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground" aria-label="Topic post draft" />
+          <p className={`text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>{draft.length} / {limit} characters</p>
+          <button onClick={doSave} disabled={busy !== null || !draft.trim() || over || !channel} className={btn}>
+            {busy === "save" ? "Saving…" : "Save as draft in Buffer"}
+          </button>
+        </div>
+      )}
+      {saved && <p className="mt-2 text-sm text-foreground">{saved}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+      {reconnect && <ReconnectButton />}
+    </div>
+  );
+}
+
+function Composer({ channels, channelId, setChannelId }: { channels: Channel[]; channelId: string; setChannelId: (id: string) => void }) {
   const runImport = useServerFn(importArticle);
   const runSave = useServerFn(saveBufferDraft);
   const [url, setUrl] = useState("");
-  const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState<"import" | "save" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +235,11 @@ function Composer({ channels }: { channels: Channel[] }) {
 function Channels() {
   const fetchChannels = useServerFn(getBufferChannels);
   const [res, setRes] = useState<ChannelsResult | null>(null);
+  const [channelId, setChannelId] = useState("");
+  useEffect(() => {
+    if (res?.status === "ok" && !channelId && res.channels[0]) setChannelId(res.channels[0].id);
+  }, [res, channelId]);
+  const selected = res?.status === "ok" ? res.channels.find((c) => c.id === channelId) : undefined;
   useEffect(() => {
     fetchChannels().then(setRes).catch(() => setRes({ status: "error" }));
   }, [fetchChannels]);
@@ -184,7 +262,7 @@ function Channels() {
       {res?.status === "error" && (
         <p className="mt-3 text-sm text-muted-foreground">Couldn't load your channels right now. Please refresh.</p>
       )}
-      {res?.status === "ok" && res.channels.length > 0 && <Composer channels={res.channels} />}
+      {res?.status === "ok" && res.channels.length > 0 && <Composer channels={res.channels} channelId={channelId} setChannelId={setChannelId} />}
       {res?.status === "ok" &&
         (res.channels.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No channels connected in Buffer yet.</p>
@@ -198,6 +276,7 @@ function Channels() {
             ))}
           </ul>
         ))}
+      <Trends channel={selected} />
     </section>
   );
 }
@@ -241,7 +320,6 @@ function AppPage() {
         {meta.name && <h1 className="mt-3 font-display text-3xl text-foreground">{meta.name}</h1>}
         <p className="mt-3 font-display text-2xl text-foreground break-all">{email}</p>
         <Channels />
-        <Trends />
         <button
           onClick={signOut}
           className="mt-8 inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium text-foreground transition-colors hover:bg-muted"
