@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   createBufferPosts, editBufferDraft, deleteBufferDraft, getBufferChannels, getBufferIdeas, createBufferIdea,
@@ -118,6 +118,8 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const [res, setRes] = useState<WriteResult | null>(null);
   const [lastAction, setLastAction] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [confirmPublish, setConfirmPublish] = useState(false);
+  const busyRef = useRef(false);
   const [media, setMedia] = useState<AttachedMedia[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [retainedPaths, setRetainedPaths] = useState<Set<string>>(new Set());
@@ -136,8 +138,12 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const canSend = !!text.trim() && chosen.length > 0 && !over && !busy && !mediaBusy;
 
-  async function send(action: "draft" | "queue" | "schedule") {
-    if (!canSend || (action === "schedule" && !dueValid)) return;
+  const canPublish = (!!text.trim() || media.length > 0) && chosen.length > 0 && !over && !busy && !mediaBusy;
+
+  async function send(action: "draft" | "queue" | "schedule" | "publish") {
+    if (busyRef.current) return;
+    if (action === "publish" ? !canPublish : (!canSend || (action === "schedule" && !dueValid))) return;
+    busyRef.current = true;
     setBusy(action); setRes(null); setLastAction(action);
     try {
       const r = await create({ data: {
@@ -156,9 +162,10 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
         onDone();
       }
     } catch { setRes({ status: "error" }); }
+    busyRef.current = false;
     setBusy(null);
   }
-  const successMsg = { draft: "Saved as a draft in Buffer.", queue: "Added to your Buffer queue.", schedule: `Scheduled for ${dueDate?.toLocaleString() ?? ""}.` }[lastAction as "draft"];
+  const successMsg = { publish: "Sent to Buffer for immediate publishing.", draft: "Saved as a draft in Buffer.", queue: "Added to your Buffer queue.", schedule: `Scheduled for ${dueDate?.toLocaleString() ?? ""}.` }[lastAction as "draft"];
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -171,7 +178,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
         <div className="mt-3 space-y-3">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
-          <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm} retainedPaths={retainedPaths} />
+          <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} />
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -195,6 +202,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
               <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={`${input} mt-1 h-10 py-0`} aria-label="Schedule date and time" />
             </label>
             <button className={primary} disabled={!canSend || !dueValid} onClick={() => setConfirm(true)}>{busy === "schedule" ? "Scheduling…" : "Schedule"}</button>
+            <button className={primary} disabled={!canPublish} onClick={() => setConfirmPublish(true)}>{busy === "publish" ? "Publishing…" : "Publish now"}</button>
           </div>
           {when && !dueValid && <p className="text-xs text-destructive">Pick a time at least a minute from now.</p>}
           {ideaId && <p className="text-xs text-muted-foreground">Started from a Buffer idea.</p>}
@@ -216,6 +224,29 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => send("schedule")}>Yes, schedule</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={confirmPublish} onOpenChange={setConfirmPublish}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publish now?</AlertDialogTitle>
+            <AlertDialogDescription>This will be posted immediately and publicly.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm">
+            {text.trim() && <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border p-3 text-foreground">{text}</p>}
+            <p><span className="text-muted-foreground">Channels: </span>{chosen.map((c) => `${c.name} (${c.service})`).join(", ")}</p>
+            {media.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {media.map((m) => m.type === "video"
+                  ? <video key={m.path} src={m.preview} muted className="h-16 w-16 rounded-lg border border-border object-cover" />
+                  : <img key={m.path} src={m.preview} alt={m.file.name} className="h-16 w-16 rounded-lg border border-border object-cover" />)}
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={!canPublish} onClick={() => send("publish")}>Publish now</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

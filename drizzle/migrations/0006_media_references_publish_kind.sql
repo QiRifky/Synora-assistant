@@ -1,0 +1,2 @@
+ALTER TABLE public.media_references DROP CONSTRAINT media_references_kind_check;
+ALTER TABLE public.media_references ADD CONSTRAINT media_references_kind_check CHECK (kind = ANY (ARRAY['draft','idea','queue','schedule','publish','pending','legacy']));

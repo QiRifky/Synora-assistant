@@ -11,7 +11,7 @@ export async function protectMedia(userId: string, media: MediaAttachment[]) {
   return operation;
 }
 
-export async function recordSavedMedia(userId: string, media: MediaAttachment[], bufferId: string, kind: "draft" | "queue" | "schedule" | "idea") {
+export async function recordSavedMedia(userId: string, media: MediaAttachment[], bufferId: string, kind: "draft" | "queue" | "schedule" | "publish" | "idea") {
   if (!media.length) return;
   const { error } = await supabaseAdmin.from("media_references").upsert(
     media.map((m) => ({ user_id: userId, path: m.path, buffer_id: bufferId, kind })),

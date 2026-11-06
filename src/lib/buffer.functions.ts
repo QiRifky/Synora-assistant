@@ -192,12 +192,12 @@ export const createBufferPosts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     channelIds: z.array(z.string().min(1).max(100)).min(1).max(20),
-    text: z.string().trim().min(1).max(5000),
-    action: z.enum(["draft", "queue", "schedule"]),
+    text: z.string().trim().max(5000),
+    action: z.enum(["draft", "queue", "schedule", "publish"]),
     dueAt: z.string().datetime().optional(),
     ideaId: z.string().max(100).optional(),
     media: mediaInput,
-  }).parse(d))
+  }).refine((v) => v.text.length > 0 || (v.action === "publish" && v.media.length > 0), { message: "Add text or media." }).parse(d))
   .handler(async ({ data, context }): Promise<WriteResult> => {
     if (data.action === "schedule") {
       if (!data.dueAt || new Date(data.dueAt).getTime() < Date.now() + 60_000) {
@@ -226,7 +226,7 @@ export const createBufferPosts = createServerFn({ method: "POST" })
       for (const channelId of data.channelIds) {
         const input: Record<string, unknown> = {
           channelId, text: data.text, assets: postAssets(media), schedulingType: "automatic", needsApproval: false,
-          mode: data.action === "schedule" ? "customScheduled" : "addToQueue",
+          mode: data.action === "schedule" ? "customScheduled" : data.action === "publish" ? "shareNow" : "addToQueue",
           saveToDraft: data.action === "draft",
         };
         if (data.action === "schedule") input["dueAt"] = data.dueAt;
