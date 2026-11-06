@@ -7,12 +7,29 @@ export type MagicResult =
   | { ok: true; text: string }
   | { ok: false; error: string };
 
+const styleSchema = z.enum([
+  "auto", "punchier", "friendly", "professional", "funny", "inspiring", "storytelling", "emojis",
+]);
+export type MagicStyle = z.infer<typeof styleSchema>;
+
+// Fixed server-side instructions; the browser may only send a style key, never free text.
+const STYLE_INSTRUCTIONS: Record<MagicStyle, string> = {
+  auto: "Make the caption more engaging while keeping the same meaning.",
+  punchier: "Make it shorter, with a stronger hook.",
+  friendly: "Make it warm and conversational.",
+  professional: "Make it clear and polished.",
+  funny: "Add light humor; no offensive jokes.",
+  inspiring: "Make it positive and motivating.",
+  storytelling: "Open with a short story-like line.",
+  emojis: "Add a few fitting emojis, but not too many.",
+};
+
 export const magicCaption = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
     z.object({
       text: z.string().trim().min(1).max(5000),
-      instruction: z.string().trim().max(200).optional(),
+      style: styleSchema.default("auto"),
       limit: z.number().int().min(0).max(5000),
     }).parse(d),
   )
@@ -31,9 +48,7 @@ export const magicCaption = createServerFn({ method: "POST" })
       hadHashtags ? "You may add at most 2 relevant hashtags." : "Do not add any hashtags.",
       `Output only the rewritten caption, no quotes or preamble. It must be at most ${cap} characters.`,
     ].join(" ");
-    const prompt = data.instruction
-      ? `Caption:\n${data.text}\n\nInstruction: ${data.instruction}`
-      : `Caption:\n${data.text}`;
+    const prompt = `Caption:\n${data.text}\n\nStyle: ${STYLE_INSTRUCTIONS[data.style]}`;
 
     try {
       const { createOpenAI } = await import("@ai-sdk/openai");

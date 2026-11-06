@@ -20,17 +20,40 @@ const btn = "inline-flex h-10 items-center rounded-full border border-border px-
 const primary = "inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:opacity-50";
 const btnSmall = "inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50";
 
+const MAGIC_STYLES = [
+  ["auto", "Auto"],
+  ["punchier", "Punchier"],
+  ["friendly", "Friendly"],
+  ["professional", "Professional"],
+  ["funny", "Funny"],
+  ["inspiring", "Inspiring"],
+  ["storytelling", "Storytelling"],
+  ["emojis", "Add emojis"],
+] as const;
+type MagicStyle = (typeof MAGIC_STYLES)[number][0];
+const MAGIC_STYLE_KEY = "synora-magic-style";
+
 function MagicBar({ text, setText, limit, limitNote }: { text: string; setText: (v: string) => void; limit: number; limitNote?: string | undefined }) {
   const run = useServerFn(magicCaption);
-  const [instruction, setInstruction] = useState("");
+  const [style, setStyle] = useState<MagicStyle>("auto");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prev, setPrev] = useState<string | null>(null);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem(MAGIC_STYLE_KEY);
+    if (saved && MAGIC_STYLES.some(([v]) => v === saved)) setStyle(saved as MagicStyle);
+  }, []);
+
+  function pickStyle(v: MagicStyle) {
+    setStyle(v);
+    window.localStorage.setItem(MAGIC_STYLE_KEY, v);
+  }
+
   async function go() {
     setBusy(true); setError(null);
     try {
-      const r = await run({ data: { text: text.trim(), ...(instruction.trim() ? { instruction: instruction.trim() } : {}), limit } });
+      const r = await run({ data: { text: text.trim(), style, limit } });
       if (r.ok) { setPrev(text); setText(r.text); }
       else setError(r.error);
     } catch { setError("Couldn't rewrite the caption right now. Please try again."); }
@@ -40,9 +63,13 @@ function MagicBar({ text, setText, limit, limitNote }: { text: string; setText: 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <input value={instruction} onChange={(e) => setInstruction(e.target.value)} maxLength={200}
-          placeholder="e.g. make it punchier, friendly tone" aria-label="Instruction (optional)"
-          className={`${input} h-9 min-w-40 flex-1 py-0 text-xs`} />
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          Style
+          <select value={style} onChange={(e) => pickStyle(e.target.value as MagicStyle)} aria-label="Style"
+            className="h-9 max-w-full rounded-full border border-border bg-background px-3 text-xs text-foreground">
+            {MAGIC_STYLES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+          </select>
+        </label>
         <span className={`text-xs ${limit > 0 && text.length > limit ? "text-destructive" : "text-muted-foreground"}`}>
           {text.length}{limit > 0 ? `/${limit}` : " characters"}{limitNote ? ` (${limitNote})` : ""}
         </span>
