@@ -35,3 +35,4 @@ use the editor.
 - Users are keyed by Buffer account id; the callback issues a one-time magic-link token_hash that `/auth/complete` exchanges for a session.
 - Buffer reads go through `src/lib/buffer.functions.ts` with a ~60s per-user in-memory cache (force=true bypasses), because Buffer rate-limits API requests.
 - Media uploads use the owner-scoped `post-media` Cloud Storage bucket; shared browser validation and authenticated server verification protect Buffer attachment inputs, and successful saves retain source files because Buffer does not guarantee ingestion before returning.
+- Hourly media cleanup uses a managed authenticated HTTP callback and service-only references; save reservations and cleanup claims share a database lock, protecting in-flight/ambiguous saves and legacy uploads from deletion.

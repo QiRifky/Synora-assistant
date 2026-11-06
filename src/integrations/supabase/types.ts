@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      media_cleanup_claims: {
+        Row: {
+          claimed_at: string
+          path: string
+        }
+        Insert: {
+          claimed_at?: string
+          path: string
+        }
+        Update: {
+          claimed_at?: string
+          path?: string
+        }
+        Relationships: []
+      }
+      media_references: {
+        Row: {
+          buffer_id: string
+          created_at: string
+          id: string
+          kind: string
+          path: string
+          user_id: string
+        }
+        Insert: {
+          buffer_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          path: string
+          user_id: string
+        }
+        Update: {
+          buffer_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       oauth_states: {
         Row: {
           code_verifier: string
@@ -85,7 +127,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_unused_media: {
+        Args: never
+        Returns: {
+          path: string
+        }[]
+      }
       magic_caption_left: { Args: { p_user_id: string }; Returns: number }
+      protect_media_save: {
+        Args: { p_operation: string; p_paths: string[]; p_user_id: string }
+        Returns: undefined
+      }
       refund_magic_caption_use: {
         Args: { p_user_id: string }
         Returns: undefined

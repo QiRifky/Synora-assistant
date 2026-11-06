@@ -220,6 +220,9 @@ export const createBufferPosts = createServerFn({ method: "POST" })
       catch (e) { return { status: "error" as const, message: e instanceof Error ? e.message : "Couldn't validate the attachments." }; }
       const token = await getToken(context.userId);
       const results: ChannelOutcome[] = [];
+      const tracking = await import("@/lib/media-tracking.server");
+      const operation = await tracking.protectMedia(context.userId, data.media);
+      let uncertain = false;
       for (const channelId of data.channelIds) {
         const input: Record<string, unknown> = {
           channelId, text: data.text, assets: postAssets(media), schedulingType: "automatic", needsApproval: false,
@@ -231,14 +234,25 @@ export const createBufferPosts = createServerFn({ method: "POST" })
         try {
           const d = await gql(token, `mutation($input: CreatePostInput!) { createPost(input: $input) { ${POST_RESULT} } }`, { input });
           const p = d?.createPost;
+          if (p?.__typename === "PostActionSuccess") {
+            if (!p.post?.id) { uncertain = true; throw new Error("Missing saved post id"); }
+            try { await tracking.recordSavedMedia(context.userId, data.media, String(p.post.id), data.action); }
+            catch {
+              uncertain = true;
+              results.push({ channelId, ok: true, message: "Saved in Buffer. Attachment tracking is pending; files remain protected." });
+              continue;
+            }
+          }
           results.push(p?.__typename === "PostActionSuccess"
             ? { channelId, ok: true, message: "Done" }
             : { channelId, ok: false, message: p?.message ? `Buffer said: ${p.message}` : "Buffer rejected this post." });
         } catch (e) {
+          uncertain = true;
           if (e instanceof Reconnect) throw e;
           results.push({ channelId, ok: false, message: "Buffer couldn't process this post." });
         }
       }
+      if (!uncertain) await tracking.finishMediaOperation(operation);
       return { status: "ok" as const, results };
     });
     clearCache(context.userId);
@@ -310,11 +324,20 @@ export const createBufferIdea = createServerFn({ method: "POST" })
       const token = await getToken(context.userId);
       const [org] = await orgIds(token);
       if (!org) return { status: "error" as const, message: "No Buffer organization found." };
+      const tracking = await import("@/lib/media-tracking.server");
+      const operation = await tracking.protectMedia(context.userId, data.media);
       const d = await gql(token, `mutation($input: CreateIdeaInput!) { createIdea(input: $input) {
         __typename ... on Idea { id } ... on IdeaResponse { idea { id } } ... on MutationError { message } } }`,
         { input: { organizationId: org, content: { title: data.title || null, text: data.text || null, media: media.map((m) => ({ url: m.url, type: "image" })) } } });
       const p = d?.createIdea;
       const ok = p?.__typename === "Idea" || p?.__typename === "IdeaResponse";
+      if (ok) {
+        const id = p?.id ?? p?.idea?.id;
+        if (!id) return { status: "error" as const, message: "Buffer saved the idea, but its identifier was unavailable. Its attachments remain protected." };
+        try { await tracking.recordSavedMedia(context.userId, data.media, String(id), "idea"); }
+        catch { return { status: "ok" as const, results: [{ channelId: "", ok: true, message: "Idea saved in Buffer. Attachment tracking is pending; files remain protected." }] }; }
+      }
+      await tracking.finishMediaOperation(operation);
       return { status: "ok" as const, results: [{ channelId: "", ok, message: ok ? "Idea saved in Buffer." : p?.message ? `Buffer said: ${p.message}` : "Buffer couldn't save the idea." }] };
     });
     clearCache(context.userId);

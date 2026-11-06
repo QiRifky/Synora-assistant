@@ -16,6 +16,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthCompleteRouteImport } from './routes/auth.complete'
 import { Route as ApiPublicBufferCallbackRouteImport } from './routes/api/public/buffer/callback'
 import { Route as ApiPublicBufferStartRouteImport } from './routes/api/public/buffer/start'
+import { Route as ApiPublicJobsMediaCleanupRouteImport } from './routes/api/public/jobs/media-cleanup'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,12 @@ const ApiPublicBufferStartRoute = ApiPublicBufferStartRouteImport.update({
   path: '/api/public/buffer/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsMediaCleanupRoute =
+  ApiPublicJobsMediaCleanupRouteImport.update({
+    id: '/api/public/jobs/media-cleanup',
+    path: '/api/public/jobs/media-cleanup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/auth/complete': typeof AuthCompleteRoute
   '/api/public/buffer/callback': typeof ApiPublicBufferCallbackRoute
   '/api/public/buffer/start': typeof ApiPublicBufferStartRoute
+  '/api/public/jobs/media-cleanup': typeof ApiPublicJobsMediaCleanupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +78,7 @@ export interface FileRoutesByTo {
   '/auth/complete': typeof AuthCompleteRoute
   '/api/public/buffer/callback': typeof ApiPublicBufferCallbackRoute
   '/api/public/buffer/start': typeof ApiPublicBufferStartRoute
+  '/api/public/jobs/media-cleanup': typeof ApiPublicJobsMediaCleanupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +89,7 @@ export interface FileRoutesById {
   '/auth/complete': typeof AuthCompleteRoute
   '/api/public/buffer/callback': typeof ApiPublicBufferCallbackRoute
   '/api/public/buffer/start': typeof ApiPublicBufferStartRoute
+  '/api/public/jobs/media-cleanup': typeof ApiPublicJobsMediaCleanupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +101,7 @@ export interface FileRouteTypes {
     | '/auth/complete'
     | '/api/public/buffer/callback'
     | '/api/public/buffer/start'
+    | '/api/public/jobs/media-cleanup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +111,7 @@ export interface FileRouteTypes {
     | '/auth/complete'
     | '/api/public/buffer/callback'
     | '/api/public/buffer/start'
+    | '/api/public/jobs/media-cleanup'
   id:
     | '__root__'
     | '/'
@@ -109,6 +121,7 @@ export interface FileRouteTypes {
     | '/auth/complete'
     | '/api/public/buffer/callback'
     | '/api/public/buffer/start'
+    | '/api/public/jobs/media-cleanup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +132,7 @@ export interface RootRouteChildren {
   AuthCompleteRoute: typeof AuthCompleteRoute
   ApiPublicBufferCallbackRoute: typeof ApiPublicBufferCallbackRoute
   ApiPublicBufferStartRoute: typeof ApiPublicBufferStartRoute
+  ApiPublicJobsMediaCleanupRoute: typeof ApiPublicJobsMediaCleanupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBufferStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/media-cleanup': {
+      id: '/api/public/jobs/media-cleanup'
+      path: '/api/public/jobs/media-cleanup'
+      fullPath: '/api/public/jobs/media-cleanup'
+      preLoaderRoute: typeof ApiPublicJobsMediaCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +204,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCompleteRoute: AuthCompleteRoute,
   ApiPublicBufferCallbackRoute: ApiPublicBufferCallbackRoute,
   ApiPublicBufferStartRoute: ApiPublicBufferStartRoute,
+  ApiPublicJobsMediaCleanupRoute: ApiPublicJobsMediaCleanupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
