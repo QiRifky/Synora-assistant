@@ -1,0 +1,3 @@
+CREATE POLICY "Users upload their own post media" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'post-media' AND (storage.foldername(name))[1] = (select auth.uid()::text) AND lower(storage.extension(name)) IN ('jpg', 'jpeg', 'png', 'webp', 'mp4'));
+CREATE POLICY "Users read their own post media" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'post-media' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+CREATE POLICY "Users delete their own post media" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'post-media' AND (storage.foldername(name))[1] = (select auth.uid()::text));
