@@ -7,7 +7,7 @@ const MESSAGES: Record<string, string> = {
 };
 
 export const Route = createFileRoute("/")({
-  validateSearch: (s: Record<string, unknown>): { error?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { error?: string | undefined } => ({
     error: typeof s["error"] === "string" ? s["error"] : undefined,
   }),
   head: () => ({

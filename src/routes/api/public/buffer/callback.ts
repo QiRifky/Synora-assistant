@@ -14,8 +14,8 @@ export const Route = createFileRoute("/api/public/buffer/callback")({
         const state = url.searchParams.get("state");
         if (!code || !state) return fail("missing_code");
 
-        const clientId = process.env.BUFFER_CLIENT_ID;
-        const clientSecret = process.env.BUFFER_CLIENT_SECRET;
+        const clientId = process.env["BUFFER_CLIENT_ID"];
+        const clientSecret = process.env["BUFFER_CLIENT_SECRET"];
         if (!clientId || !clientSecret) return fail("not_configured");
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

@@ -5,7 +5,7 @@ export const Route = createFileRoute("/api/public/buffer/start")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const clientId = process.env.BUFFER_CLIENT_ID;
+        const clientId = process.env["BUFFER_CLIENT_ID"];
         if (!clientId) return Response.redirect(new URL("/?error=not_configured", request.url), 302);
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
