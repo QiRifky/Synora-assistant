@@ -1,8 +1,10 @@
 import { z } from "zod";
 
+import { GLOBAL_MAX_BYTES, GLOBAL_MAX_FILES } from "@/lib/media-limits";
+
 export const MEDIA_BUCKET = "post-media";
-export const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
-export const MAX_MEDIA_FILES = 10;
+export const MAX_MEDIA_BYTES = GLOBAL_MAX_BYTES;
+export const MAX_MEDIA_FILES = GLOBAL_MAX_FILES;
 export const MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4"] as const;
 export const mediaInput = z.array(z.object({
   path: z.string().max(200).regex(/^[a-f0-9-]{36}\/[a-f0-9-]{36}\.(jpg|png|webp|mp4)$/i),
@@ -11,7 +13,7 @@ export const mediaInput = z.array(z.object({
 export type MediaAttachment = { path: string; type: "image" | "video" };
 
 export function validateMedia(file: { name: string; size: number; type: string }, imagesOnly = false): string | null {
-  if (file.size > MAX_MEDIA_BYTES) return `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. The maximum is 10 MB.`;
+  if (file.size > MAX_MEDIA_BYTES) return `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. The maximum is 20 MB.`;
   const extensions: Record<string, RegExp> = { "image/jpeg": /\.jpe?g$/i, "image/png": /\.png$/i, "image/webp": /\.webp$/i, "video/mp4": /\.mp4$/i };
   if (!extensions[file.type]?.test(file.name) || (imagesOnly && file.type === "video/mp4")) {
     return `${file.name}: ${imagesOnly ? "Ideas support JPG, PNG and WebP images only; Buffer's public ideas API does not support video." : "Only JPG, PNG, WebP images and MP4 video are supported."}`;
@@ -21,7 +23,7 @@ export function validateMedia(file: { name: string; size: number; type: string }
 }
 
 export function validateMediaCount(count: number): string | null {
-  return count > MAX_MEDIA_FILES ? "The maximum is 10 files per post." : null;
+  return count > MAX_MEDIA_FILES ? `The maximum is ${MAX_MEDIA_FILES} files per post.` : null;
 }
 
 export function ownsMedia(path: string, userId: string): boolean {

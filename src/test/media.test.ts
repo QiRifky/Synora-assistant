@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { MAX_MEDIA_BYTES, validateMedia, validateMediaCount, ownsMedia, resizeDimensions, postAssets, mediaInput } from "@/lib/media";
 
 describe("Media attachment rules", () => {
-  it("accepts exactly 10 MB but rejects larger images and videos with name and size", () => {
-    expect(MAX_MEDIA_BYTES).toBe(10485760);
+  it("accepts exactly 20 MB but rejects larger images and videos with name and size", () => {
+    expect(MAX_MEDIA_BYTES).toBe(20971520);
     for (const [type, name] of [["image/png", "photo.png"], ["video/mp4", "clip.mp4"]]) {
-      expect(validateMedia({ name: name ?? "", type: type ?? "", size: 10485760 })).toBeNull();
-      expect(validateMedia({ name: name ?? "", type: type ?? "", size: Math.round(14.2 * 1048576) })).toBe(`${name} is 14.2 MB. The maximum is 10 MB.`);
+      expect(validateMedia({ name: name ?? "", type: type ?? "", size: 20971520 })).toBeNull();
+      expect(validateMedia({ name: name ?? "", type: type ?? "", size: Math.round(24.2 * 1048576) })).toBe(`${name} is 24.2 MB. The maximum is 20 MB.`);
     }
   });
   it("accepts only JPG PNG WebP MP4 and rejects mismatched extensions", () => {
@@ -14,12 +14,12 @@ describe("Media attachment rules", () => {
     expect(validateMedia({ name: "a.gif", type: "image/gif", size: 100 })).not.toBeNull();
     expect(validateMedia({ name: "a.exe", type: "image/png", size: 100 })).not.toBeNull();
   });
-  it("limits attachments to ten in browser and server input", () => {
-    expect(validateMediaCount(10)).toBeNull();
-    expect(validateMediaCount(11)).not.toBeNull();
+  it("limits attachments to eight in browser and server input", () => {
+    expect(validateMediaCount(8)).toBeNull();
+    expect(validateMediaCount(9)).not.toBeNull();
     const item = { path: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png", type: "image" };
-    expect(mediaInput.safeParse(Array(10).fill(item)).success).toBe(true);
-    expect(mediaInput.safeParse(Array(11).fill(item)).success).toBe(false);
+    expect(mediaInput.safeParse(Array(8).fill(item)).success).toBe(true);
+    expect(mediaInput.safeParse(Array(9).fill(item)).success).toBe(false);
   });
   it("rejects another user's media and traversal paths", () => {
     const owner = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";

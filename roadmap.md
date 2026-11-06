@@ -7,3 +7,6 @@
 - [x] Verify rules, signed-in validation UI and live private-bucket size/ownership protections.
 - [x] Verify public upload, crop/resize, public URL access and removal; Buffer saving was not exercised during the upload-only check.
 - [x] Enable public media bucket, retaining owner-scoped policies and the 10 MB limit.
+- [x] Add per-channel media limits (strictest wins, no image/video mixing), live limit display and server enforcement.
+- [x] Add browser image compression (1440 px, ~80% quality) and 100 MB per-user storage quota with server enforcement.
+- [x] Extend hourly cleanup: delete files of sent posts after 7 days and files of deleted drafts; bucket limit raised to 20 MB.

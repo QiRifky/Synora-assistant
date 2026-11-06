@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -6,10 +6,15 @@ import { ImagePlus, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { getMediaAvailability } from "@/lib/media.functions";
-import { MEDIA_BUCKET, validateMedia, validateMediaCount, resizeDimensions, type MediaAttachment } from "@/lib/media";
+import { getMediaAvailability, getMediaUsage } from "@/lib/media.functions";
+import { MEDIA_BUCKET, validateMedia, resizeDimensions, type MediaAttachment } from "@/lib/media";
+import {
+  COMPRESS_MAX_SIDE, COMPRESS_QUALITY, COMPRESS_SKIP_BYTES, GLOBAL_MAX_FILES,
+  checkMediaAgainstLimits, describeLimits, effectiveMediaLimits, formatBytes,
+  type ChannelInfo, type MediaFileInfo,
+} from "@/lib/media-limits";
 
-export type AttachedMedia = MediaAttachment & { file: File; preview: string };
+export type AttachedMedia = MediaAttachment & { file: File; preview: string; note?: string | null };
 
 async function upload(file: File, progress: (n: number) => void): Promise<AttachedMedia> {
   const { data } = await supabase.auth.getUser();
@@ -32,35 +37,96 @@ async function upload(file: File, progress: (n: number) => void): Promise<Attach
   return { file, path, type: file.type === "video/mp4" ? "video" : "image", preview: URL.createObjectURL(file) };
 }
 
-export function MediaAttachments({ value, onChange, onBusy, disabled = false, imagesOnly = false, retainedPaths }: {
+// Shrinks images before upload: max 1440 px on the longest side, JPG/WebP at
+// ~80% quality, PNG kept only when it has transparency. Never upscales, never
+// touches videos, and skips files already below 500 KB.
+async function compressImage(file: File): Promise<{ file: File; note: string | null }> {
+  if (!file.type.startsWith("image/") || file.size < COMPRESS_SKIP_BYTES) return { file, note: null };
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, COMPRESS_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return { file, note: null };
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    let type = file.type;
+    if (file.type === "image/png") {
+      const pixels = context.getImageData(0, 0, width, height).data;
+      let transparent = false;
+      for (let i = 3; i < pixels.length; i += 40) { if ((pixels[i] ?? 255) < 255) { transparent = true; break; } }
+      if (!transparent) type = "image/jpeg";
+    }
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, COMPRESS_QUALITY));
+    if (!blob || blob.size >= file.size) return { file, note: null };
+    const name = type === file.type ? file.name : file.name.replace(/\.png$/i, ".jpg");
+    return { file: new File([blob], name, { type }), note: `${formatBytes(file.size)} → ${formatBytes(blob.size)}` };
+  } catch {
+    return { file, note: null };
+  }
+}
+
+export function MediaAttachments({ value, onChange, onBusy, disabled = false, imagesOnly = false, retainedPaths, channels, onViolation }: {
   value: AttachedMedia[]; onChange: (v: AttachedMedia[]) => void; onBusy: (v: boolean) => void; disabled?: boolean; imagesOnly?: boolean; retainedPaths?: Set<string>;
+  channels?: ChannelInfo[]; onViolation?: (message: string | null) => void;
 }) {
   const checkAvailability = useServerFn(getMediaAvailability);
+  const loadUsage = useServerFn(getMediaUsage);
   const picker = useRef<HTMLInputElement>(null);
   const lock = useRef(false);
   const [available, setAvailable] = useState<boolean | null>(null);
+  const [usage, setUsage] = useState<{ usedBytes: number; quotaBytes: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ name: string; percent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<AttachedMedia | null>(null);
+
+  const limits = effectiveMediaLimits(channels ?? []);
+  const toInfo = (m: { file: File; type: "image" | "video" }): MediaFileInfo => ({ name: m.file.name, size: m.file.size, kind: m.type });
+
+  const refreshUsage = useCallback(() => { loadUsage().then(setUsage).catch(() => {}); }, [loadUsage]);
   useEffect(() => { checkAvailability().then((r) => setAvailable(r.available)).catch(() => setAvailable(false)); }, [checkAvailability]);
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
+
+  // Re-check existing files whenever the channel selection or files change;
+  // report violations so the form can block saving. Files are never auto-deleted.
+  const violation = checkMediaAgainstLimits(value.map(toInfo), limits);
+  useEffect(() => { onViolation?.(violation); }, [violation, onViolation]);
+
   function working(v: boolean) { lock.current = v; setBusy(v); onBusy(v); }
 
   async function add(files: File[]) {
     if (lock.current || disabled) return;
     setError(null);
-    const countError = validateMediaCount(value.length + files.length);
-    const errors = files.map((f) => validateMedia(f, imagesOnly)).filter(Boolean);
-    if (countError || errors.length) { setError(countError ?? errors.join(" ")); return; }
+    const typeErrors = files.map((f) => f.size === 0 ? `${f.name} is empty.` : validateMedia({ name: f.name, size: 1, type: f.type }, imagesOnly)).filter(Boolean);
+    if (typeErrors.length) { setError(typeErrors.join(" ")); return; }
     if (!available) { setError("Media uploads are unavailable until public storage is enabled by your workspace owner."); return; }
     working(true);
-    const next = [...value];
     try {
+      // Compress first, then check channel limits on the compressed files.
+      const prepared: { file: File; note: string | null }[] = [];
       for (const file of files) {
         setProgress({ name: file.name, percent: 0 });
-        next.push(await upload(file, (percent) => setProgress({ name: file.name, percent })));
+        prepared.push(await compressImage(file));
+      }
+      const incoming = prepared.map((p) => ({ name: p.file.name, size: p.file.size, kind: (p.file.type === "video/mp4" ? "video" : "image") as "image" | "video" }));
+      const limitError = checkMediaAgainstLimits([...value.map(toInfo), ...incoming], limits);
+      if (limitError) { setError(limitError); return; }
+      const addedBytes = prepared.reduce((sum, p) => sum + p.file.size, 0);
+      if (usage && usage.usedBytes + addedBytes > usage.quotaBytes) {
+        setError("Your 100 MB media storage is full. Remove old files or delete old drafts to free space.");
+        return;
+      }
+      const next = [...value];
+      for (const p of prepared) {
+        setProgress({ name: p.file.name, percent: 0 });
+        next.push({ ...(await upload(p.file, (percent) => setProgress({ name: p.file.name, percent }))), note: p.note });
         onChange([...next]);
       }
+      refreshUsage();
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn't upload media. Please try again."); }
     finally { setProgress(null); working(false); }
   }
@@ -75,6 +141,7 @@ export function MediaAttachments({ value, onChange, onBusy, disabled = false, im
       }
       URL.revokeObjectURL(item.preview);
       onChange(value.filter((m) => m.path !== item.path));
+      refreshUsage();
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn't remove media."); }
     finally { working(false); }
   }
@@ -87,7 +154,10 @@ export function MediaAttachments({ value, onChange, onBusy, disabled = false, im
     working(true); setError(null);
     let replacement: AttachedMedia | null = null;
     try {
-      replacement = await upload(file, (percent) => setProgress({ name: file.name, percent }));
+      const prepared = await compressImage(file);
+      const limitError = checkMediaAgainstLimits([...value.filter((m) => m.path !== original.path).map(toInfo), { name: prepared.file.name, size: prepared.file.size, kind: "image" }], limits);
+      if (limitError) { setError(limitError); return; }
+      replacement = { ...(await upload(prepared.file, (percent) => setProgress({ name: prepared.file.name, percent }))), note: prepared.note };
       if (!retainedPaths?.has(original.path)) {
         const { error: failure } = await supabase.storage.from(MEDIA_BUCKET).remove([original.path]);
         if (failure) throw new Error("Couldn't replace the original image. Please try again.");
@@ -95,6 +165,7 @@ export function MediaAttachments({ value, onChange, onBusy, disabled = false, im
       URL.revokeObjectURL(original.preview);
       onChange(value.map((m) => m.path === original.path ? replacement ?? m : m));
       setEditing(null);
+      refreshUsage();
     } catch (e) {
       if (replacement) {
         await supabase.storage.from(MEDIA_BUCKET).remove([replacement.path]);
@@ -104,27 +175,34 @@ export function MediaAttachments({ value, onChange, onBusy, disabled = false, im
     } finally { setProgress(null); working(false); }
   }
 
+  const activeMax = value.some((m) => m.type === "video") ? limits.maxVideos : limits.maxImages;
+
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <Button type="button" variant="outline" disabled={busy || disabled || value.length >= 10} onClick={() => picker.current?.click()}><ImagePlus /> Add media</Button>
-      <span className="text-xs text-muted-foreground">{value.length}/10 files · 10 MB each</span>
+      <Button type="button" variant="outline" disabled={busy || disabled || value.length >= GLOBAL_MAX_FILES} onClick={() => picker.current?.click()}><ImagePlus /> Add media</Button>
+      <span className="text-xs text-muted-foreground">{value.length}/{activeMax} files · max {formatBytes(limits.imageMaxBytes)} each</span>
     </div>
     <input ref={picker} className="sr-only" type="file" multiple accept={imagesOnly ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,video/mp4"} aria-label="Media files" disabled={busy || disabled} onChange={(e) => { void add(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
     <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void add(Array.from(e.dataTransfer.files)); }} className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
       Drop {imagesOnly ? "JPG, PNG or WebP images" : "JPG, PNG, WebP or MP4 files"} here
     </div>
+    {channels && <p className="text-xs text-muted-foreground">{describeLimits(limits)}</p>}
+    {limits.unchecked.map((name) => <p key={name} className="text-xs text-muted-foreground">Limits for this channel are not checked: {name}</p>)}
+    {usage && <p className="text-xs text-muted-foreground">Storage used: {formatBytes(usage.usedBytes)} of {formatBytes(usage.quotaBytes)}</p>}
     {available === false && <p role="alert" className="text-xs text-destructive">Public media storage is not enabled. Uploads are unavailable.</p>}
     {progress && <div role="status" className="space-y-1"><p className="break-words text-xs text-muted-foreground">Uploading {progress.name} · {progress.percent}%</p><progress className="h-2 w-full accent-primary" max={100} value={progress.percent} aria-label="Upload progress" /></div>}
     {value.length > 0 && <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {value.map((m) => <li key={m.path} className="min-w-0 rounded-lg border border-border p-2">
         {m.type === "image" ? <img src={m.preview} alt={m.file.name} className="aspect-square w-full rounded-md object-contain" /> : <video src={m.preview} controls preload="metadata" className="aspect-square w-full rounded-md object-contain" />}
         <p className="mt-2 truncate text-xs text-muted-foreground" title={m.file.name}>{m.file.name}</p>
+        {m.note && <p className="text-xs text-muted-foreground">{m.note}</p>}
         <div className="mt-2 flex gap-2">
           {m.type === "image" && <Button type="button" variant="outline" size="sm" disabled={busy || disabled} onClick={() => setEditing(m)}><Pencil /> Edit</Button>}
           <Button type="button" variant="ghost" size="icon" title={`Remove ${m.file.name}`} aria-label={`Remove ${m.file.name}`} disabled={busy || disabled} onClick={() => void remove(m)}><X /></Button>
         </div>
       </li>)}
     </ul>}
+    {violation && <p role="alert" className="text-sm text-destructive">{violation}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {editing && <ImageEditor media={editing} busy={busy || disabled} onClose={() => { if (!busy) setEditing(null); }} onSave={replace} />}
   </div>;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { charLimit } from "@/lib/trends.functions";
 import { mediaInput, ownsMedia, postAssets, MAX_MEDIA_BYTES, MEDIA_BUCKET, type MediaAttachment } from "@/lib/media";
+import { checkMediaAgainstLimits, effectiveMediaLimits, formatBytes, type EffectiveMediaLimits } from "@/lib/media-limits";
 
 export type BufferChannel = { id: string; name: string; service: string; avatar: string | null };
 export type ChannelsResult =
@@ -169,7 +170,7 @@ export type WriteResult =
 
 const POST_RESULT = `__typename ... on PostActionSuccess { post { id } } ... on MutationError { message }`;
 
-async function resolveMedia(userId: string, attachments: MediaAttachment[], imagesOnly = false) {
+async function resolveMedia(userId: string, attachments: MediaAttachment[], imagesOnly = false, limits: EffectiveMediaLimits = effectiveMediaLimits([])) {
   if (!attachments.length) return [];
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: bucket } = await supabaseAdmin.storage.getBucket(MEDIA_BUCKET);
@@ -179,7 +180,9 @@ async function resolveMedia(userId: string, attachments: MediaAttachment[], imag
     if (!ownsMedia(attachment.path, userId) || (imagesOnly && attachment.type === "video")) throw new Error("Invalid media attachment.");
     const { data: info, error } = await supabaseAdmin.storage.from(MEDIA_BUCKET).info(attachment.path);
     const expected = attachment.path.endsWith(".mp4") ? "video" : "image";
-    if (error || !info || typeof info.size !== "number" || info.size > MAX_MEDIA_BYTES || info.size <= 0 || attachment.type !== expected) throw new Error("An attachment is missing, invalid or larger than 10 MB. Please remove it and upload again.");
+    const maxBytes = attachment.type === "image" ? limits.imageMaxBytes : limits.videoMaxBytes;
+    if (error || !info || typeof info.size !== "number" || info.size > MAX_MEDIA_BYTES || info.size <= 0 || attachment.type !== expected) throw new Error("An attachment is missing, invalid or larger than 20 MB. Please remove it and upload again.");
+    if (info.size > maxBytes) throw new Error(`An attachment is ${formatBytes(info.size)}, over the ${formatBytes(maxBytes)} limit for the selected channel. Please remove it and upload a smaller file.`);
     const allowed = expected === "video" ? ["video/mp4"] : ["image/jpeg", "image/png", "image/webp"];
     if (!info.contentType || !allowed.includes(info.contentType)) throw new Error("Only JPG, PNG, WebP images and MP4 video are supported.");
     const url = `${import.meta.env['VITE_SUPABASE_URL']}/storage/v1/object/public/${MEDIA_BUCKET}/${attachment.path}`;
@@ -214,9 +217,12 @@ export const createBufferPosts = createServerFn({ method: "POST" })
         return { status: "error", message: `Too long for ${c.name} (max ${charLimit(c.service)} characters).` };
       }
     }
+    const limits = effectiveMediaLimits(data.channelIds.map((id) => byId.get(id)!));
+    const violation = checkMediaAgainstLimits(data.media.map((m) => ({ name: m.path, size: 0, kind: m.type })), limits);
+    if (violation) return { status: "error", message: violation };
     const r = await guard(async () => {
       let media;
-      try { media = await resolveMedia(context.userId, data.media); }
+      try { media = await resolveMedia(context.userId, data.media, false, limits); }
       catch (e) { return { status: "error" as const, message: e instanceof Error ? e.message : "Couldn't validate the attachments." }; }
       const token = await getToken(context.userId);
       const results: ChannelOutcome[] = [];
@@ -286,6 +292,11 @@ export const deleteBufferDraft = createServerFn({ method: "POST" })
         __typename ... on DeletePostSuccess { id } ... on MutationError { message } } }`, { input: { id: data.id } });
       const p = d?.deletePost;
       const ok = p?.__typename === "DeletePostSuccess";
+      if (ok) {
+        // Remove attached files that no other saved post or idea still uses.
+        const tracking = await import("@/lib/media-tracking.server");
+        await tracking.releaseMedia(data.id);
+      }
       return { status: "ok" as const, results: [{ channelId: "", ok, message: ok ? "Draft deleted." : p?.message ? `Buffer said: ${p.message}` : "Buffer couldn't delete the draft." }] };
     });
     clearCache(context.userId);

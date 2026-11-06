@@ -134,6 +134,7 @@ export type Database = {
         }[]
       }
       magic_caption_left: { Args: { p_user_id: string }; Returns: number }
+      media_usage_bytes: { Args: { p_user_id: string }; Returns: number }
       protect_media_save: {
         Args: { p_operation: string; p_paths: string[]; p_user_id: string }
         Returns: undefined
@@ -141,6 +142,12 @@ export type Database = {
       refund_magic_caption_use: {
         Args: { p_user_id: string }
         Returns: undefined
+      }
+      release_media_references: {
+        Args: { p_buffer_id: string }
+        Returns: {
+          path: string
+        }[]
       }
       try_magic_caption_use: { Args: { p_user_id: string }; Returns: string }
     }

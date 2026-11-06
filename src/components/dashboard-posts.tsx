@@ -122,6 +122,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const busyRef = useRef(false);
   const [media, setMedia] = useState<AttachedMedia[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaViolation, setMediaViolation] = useState<string | null>(null);
   const [retainedPaths, setRetainedPaths] = useState<Set<string>>(new Set());
 
   useEffect(() => { loadChannels({ data: {} }).then(setChannels).catch(() => setChannels({ status: "error" })); }, [loadChannels]);
@@ -136,9 +137,9 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const dueDate = when ? new Date(when) : null;
   const dueValid = !!dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() > Date.now() + 60_000;
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const canSend = !!text.trim() && chosen.length > 0 && !over && !busy && !mediaBusy;
+  const canSend = !!text.trim() && chosen.length > 0 && !over && !busy && !mediaBusy && !mediaViolation;
 
-  const canPublish = (!!text.trim() || media.length > 0) && chosen.length > 0 && !over && !busy && !mediaBusy;
+  const canPublish = (!!text.trim() || media.length > 0) && chosen.length > 0 && !over && !busy && !mediaBusy && !mediaViolation;
 
   async function send(action: "draft" | "queue" | "schedule" | "publish") {
     if (busyRef.current) return;
@@ -178,7 +179,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
         <div className="mt-3 space-y-3">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
-          <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} />
+          <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
             <div className="mt-2 flex flex-wrap gap-2">

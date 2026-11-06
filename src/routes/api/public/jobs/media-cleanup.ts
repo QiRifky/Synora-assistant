@@ -18,6 +18,11 @@ export const Route = createFileRoute("/api/public/jobs/media-cleanup")({
       const { error: removalError } = await supabaseAdmin.storage.from(MEDIA_BUCKET).remove(batch);
       return !removalError;
     });
+    if (deleted > 0) {
+      // Drop references and claims only for files that were actually removed.
+      await supabaseAdmin.from("media_references").delete().in("path", paths).eq("kind", "publish");
+      await supabaseAdmin.from("media_cleanup_claims").delete().in("path", paths);
+    }
     console.info("Media cleanup deleted", deleted);
     return Response.json({ deleted }, { status: paths.length && !deleted ? 503 : 200 });
   } } },
