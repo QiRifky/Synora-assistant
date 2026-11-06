@@ -24,7 +24,7 @@ function decode(s: string) {
 
 function tag(block: string, name: string) {
   const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i"));
-  return m ? decode(m[1]) : "";
+  return m ? decode(m[1] ?? "") : "";
 }
 
 function toIso(d: string) {
@@ -111,7 +111,7 @@ export const collectTrends = createServerFn({ method: "POST" })
     const items: TrendItem[] = [];
     results.forEach((r, i) => {
       if (r.status === "fulfilled" && r.value.length) items.push(...r.value);
-      else failed.push(sources[i].name);
+      else failed.push(sources[i]?.name ?? "Unknown source");
     });
     const seen = new Set<string>();
     const unique = items.filter((i) => (seen.has(i.link) ? false : (seen.add(i.link), true)));
@@ -158,7 +158,7 @@ export const findTopics = createServerFn({ method: "POST" })
       const topics = parsed.topics.slice(0, 5).map((t) => ({
         topic: t.topic,
         reason: t.reason,
-        links: t.items.map((i) => data.items[i]).filter(Boolean).slice(0, 5),
+        links: t.items.map((i) => data.items[i]).filter((x): x is { title: string; link: string } => !!x).slice(0, 5),
       }));
       if (!topics.length) return { ok: false, error: "Couldn't find topics in these items." };
       return { ok: true, topics };
