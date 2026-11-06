@@ -15,6 +15,13 @@
       "when": 1793995063177,
       "tag": "0001_magic_caption_daily_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793995854685,
+      "tag": "0002_retire_magic_caption_usage_counter",
+      "breakpoints": true
     }
   ]
 }

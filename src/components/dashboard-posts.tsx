@@ -5,7 +5,7 @@ import {
   type BufferChannel, type ChannelsResult, type IdeasResult, type WriteResult,
 } from "@/lib/buffer.functions";
 import { charLimit } from "@/lib/trends.functions";
-import { magicCaption, getMagicCaptionAllowance } from "@/lib/magic.functions";
+import { magicCaption } from "@/lib/magic.functions";
 import { Sparkles, Undo2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -21,27 +21,21 @@ const btnSmall = "inline-flex h-9 items-center gap-1.5 rounded-full border borde
 
 function MagicBar({ text, setText, limit, limitNote }: { text: string; setText: (v: string) => void; limit: number; limitNote?: string | undefined }) {
   const run = useServerFn(magicCaption);
-  const loadLeft = useServerFn(getMagicCaptionAllowance);
   const [instruction, setInstruction] = useState("");
-  const [left, setLeft] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prev, setPrev] = useState<string | null>(null);
-
-  useEffect(() => { loadLeft().then((r) => setLeft(r.left)).catch(() => {}); }, [loadLeft]);
 
   async function go() {
     setBusy(true); setError(null);
     try {
       const r = await run({ data: { text: text.trim(), ...(instruction.trim() ? { instruction: instruction.trim() } : {}), limit } });
-      setLeft(r.left);
       if (r.ok) { setPrev(text); setText(r.text); }
       else setError(r.error);
     } catch { setError("Couldn't rewrite the caption right now. Please try again."); }
     setBusy(false);
   }
 
-  const out = left === 0;
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -56,13 +50,10 @@ function MagicBar({ text, setText, limit, limitNote }: { text: string; setText: 
             <Undo2 className="h-3.5 w-3.5" aria-hidden /> Undo
           </button>
         )}
-        <button type="button" className={btnSmall} disabled={busy || !text.trim() || out} onClick={go}>
+        <button type="button" className={btnSmall} disabled={busy || !text.trim()} onClick={go}>
           <Sparkles className="h-3.5 w-3.5" aria-hidden /> {busy ? "Rewriting…" : "Magic Caption"}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {out ? "Daily limit reached, try again tomorrow." : left !== null ? `${left} of 50 left today` : " "}
-      </p>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );

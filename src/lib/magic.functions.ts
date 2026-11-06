@@ -3,21 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fitToLimit } from "@/lib/trends.functions";
 
-const DAILY_LIMIT = 50;
-
 export type MagicResult =
-  | { ok: true; text: string; left: number }
-  | { ok: false; error: string; left: number };
-
-async function leftFor(userId: string): Promise<number> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin.rpc("magic_caption_left", { p_user_id: userId });
-  return typeof data === "number" ? data : DAILY_LIMIT;
-}
-
-export const getMagicCaptionAllowance = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => ({ left: await leftFor(context.userId), limit: DAILY_LIMIT }));
+  | { ok: true; text: string }
+  | { ok: false; error: string };
 
 export const magicCaption = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -28,21 +16,10 @@ export const magicCaption = createServerFn({ method: "POST" })
       limit: z.number().int().min(0).max(5000),
     }).parse(d),
   )
-  .handler(async ({ data, context }): Promise<MagicResult> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: slot } = await supabaseAdmin.rpc("try_magic_caption_use", { p_user_id: context.userId });
-    if (slot === "busy") {
-      return { ok: false, left: await leftFor(context.userId), error: "Another Magic Caption is still running. Please wait a moment." };
-    }
-    if (slot === "out") {
-      return { ok: false, left: 0, error: "Daily limit reached, try again tomorrow." };
-    }
-
-    const refund = () => supabaseAdmin.rpc("refund_magic_caption_use", { p_user_id: context.userId });
+  .handler(async ({ data }): Promise<MagicResult> => {
     const apiKey = process.env["LOVABLE_API_KEY"];
     if (!apiKey) {
-      await refund();
-      return { ok: false, left: await leftFor(context.userId), error: "Magic Caption is temporarily unavailable. Please try again later." };
+      return { ok: false, error: "Magic Caption is temporarily unavailable. Please try again later." };
     }
 
     const cap = data.limit > 0 ? data.limit : 500;
@@ -78,17 +55,15 @@ export const magicCaption = createServerFn({ method: "POST" })
         },
       });
       let text = (await result.text).trim().replace(/^["'«»“”]+|["'«»“”]+$/g, "").trim();
-      if (!text) return { ok: false, left: await leftFor(context.userId), error: "The AI returned nothing. Please try again." };
+      if (!text) return { ok: false, error: "The AI returned nothing. Please try again." };
       if (data.limit > 0 && text.length > data.limit) text = fitToLimit(text, data.limit);
-      return { ok: true, text, left: await leftFor(context.userId) };
+      return { ok: true, text };
     } catch (e: any) {
-      await refund();
       const status = e?.statusCode ?? e?.status;
       console.error("magic caption failed", status);
-      const left = await leftFor(context.userId);
       if (status === 429 || status === 402) {
-        return { ok: false, left, error: "Magic Caption is temporarily unavailable. Please try again later." };
+        return { ok: false, error: "Magic Caption is temporarily unavailable. Please try again later." };
       }
-      return { ok: false, left, error: "Couldn't rewrite the caption right now. Please try again." };
+      return { ok: false, error: "Couldn't rewrite the caption right now. Please try again." };
     }
   });
