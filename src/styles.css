@@ -202,6 +202,13 @@
   .icon-folder { height: 326px; }
   .icon-folder-front { height: 220px; }
 }
+/* Very narrow: the title wraps further, so the flap grows to keep the
+   platform labels clear of the small icon row. */
+@media (max-width: 360px) {
+  .icon-folder { height: 350px; }
+  .icon-folder-front { height: 244px; }
+  .icon-folder-front h3 { font-size: 20px; line-height: 28px; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .icon-folder[data-shown="false"] { opacity: 0; transform: translateY(34px) scale(.92); }
   .icon-folder[data-shown="false"] .icon-folder-icon { transform: translateY(80px) !important; }
@@ -308,8 +315,3 @@
 .landing .icon-folder-front { border: 1px solid #e5e5e5; }
 .landing .icon-folder-tile { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
 .landing .icon-folder-tag { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
-/* "and more channels" tile at the end of the folder's small icon row */
-.icon-folder-pill > span.icon-folder-pill-more { width: auto; }
-.icon-folder-pill-more .icon-folder-tile {
-  width: auto; padding: 0 8px; font-size: 11px; line-height: 1; white-space: nowrap;
-}

@@ -106,12 +106,8 @@ const CHANNEL_ICONS: FolderIcon[] = PLATFORMS.map((name) => ({
   node: <svg viewBox="0 0 24 24" aria-hidden="true"><path d={PLATFORM_PATHS[name]} /></svg>,
 }));
 
-// Same tile style as the platform marks, but wide enough to read at a glance.
-const PILL_MORE = (
-  <span className="icon-folder-pill-more">
-    <span className="icon-folder-tile">and more channels</span>
-  </span>
-);
+// The channel list ends with a plain-text entry for everything else.
+const CHANNEL_TAGS = [...PLATFORMS, "and more channels"];
 
 const TRUST = [
   { icon: HandMetal, text: "Your original photo is always kept until you choose" },
@@ -261,7 +257,7 @@ function Index() {
             </p>
           </div>
           <div className="mt-12 flex min-w-0 justify-center lg:mt-0">
-            <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} pillExtra={PILL_MORE} />
+            <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={CHANNEL_TAGS} theme="light" spread={58} />
           </div>
         </div>
       </section>
