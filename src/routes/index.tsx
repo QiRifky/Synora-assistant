@@ -23,7 +23,7 @@ const MESSAGES: Record<string, string> = {
 const SIGN_IN_CLASS =
   "landing-btn inline-flex h-12 items-center px-8 text-base font-medium";
 
-const CONTAINER = "mx-auto w-full max-w-[1100px] px-6";
+const CONTAINER = "landing-container";
 
 // Example before/after pairs. Add real photo URLs here when available; a
 // missing image shows a clearly labeled placeholder instead.

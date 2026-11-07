@@ -315,3 +315,25 @@
 .landing .icon-folder-front { border: 1px solid #e5e5e5; }
 .landing .icon-folder-tile { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
 .landing .icon-folder-tag { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
+
+/* Shared landing container: nav, hero text, sections and footer align to one edge. */
+@utility landing-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--landing-gutter);
+}
+:root { --landing-gutter: 24px; }
+@media (min-width: 768px) { :root { --landing-gutter: 32px; } }
+.landing .af-experience .intro {
+  left: max(var(--landing-gutter), calc((100% - 1200px) / 2 + var(--landing-gutter))) !important;
+}
+.landing .af-experience[data-layout=phone]:not(.simple) .intro {
+  width: calc(100% - 2 * var(--landing-gutter)) !important;
+}
+.landing .af-experience.simple .intro {
+  left: auto !important;
+  max-width: 1200px !important;
+  margin-inline: auto;
+  padding-inline: var(--landing-gutter) !important;
+}
