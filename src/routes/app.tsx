@@ -1,12 +1,12 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getBufferChannels, getBufferPosts, getBufferSummary, type PostStatus } from "@/lib/buffer.functions";
+import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSummary, type PostStatus } from "@/lib/buffer.functions";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, RefreshCw, LogOut } from "lucide-react";
+import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, RefreshCw, LogOut, ExternalLink } from "lucide-react";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 
 import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
@@ -342,14 +342,43 @@ function OverviewView() {
 
 function ChannelsView() {
   const fn = useServerFn(getBufferChannels);
-  const { res, busy, refresh } = useLoad((force) => fn({ data: { force } }));
+  const limitFn = useServerFn(getBufferChannelLimit);
+  const [limit, setLimit] = useState<Awaited<ReturnType<typeof getBufferChannelLimit>> | null>(null);
+  const last = useRef(Date.now());
+  const { res, busy, refresh } = useLoad((force) => {
+    last.current = Date.now();
+    limitFn({ data: { force } }).then(setLimit).catch(() => setLimit({ status: "error" }));
+    return fn({ data: { force } });
+  });
+  // Reload when the user returns from Buffer, at most once every 30 seconds.
+  useEffect(() => {
+    const onFocus = () => { if (Date.now() - last.current >= 30_000) refresh(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  });
+  const atLimit = limit?.status === "ok" && limit.orgs.some((o) => o.limit > 0 && o.used >= o.limit);
+  const known = limit?.status === "ok" && limit.orgs.length > 0;
   return (
     <>
-      <PageHeader title="Channels" onRefresh={refresh} busy={busy} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-3xl text-foreground">Channels</h1>
+        <div className="flex flex-wrap gap-2">
+          <a href="https://publish.buffer.com" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm text-primary-foreground hover:opacity-90">
+            <ExternalLink className="h-4 w-4" /> Connect a new channel
+          </a>
+          <button onClick={refresh} disabled={busy} className="inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm text-foreground hover:bg-muted disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> Refresh channels
+          </button>
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">Connect your channel in Buffer, then come back and click Refresh.</p>
+      {atLimit && <p role="status" className="mt-3 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Your Buffer plan allows a limited number of channels. You've reached it, so remove a channel or upgrade in Buffer to add another.</p>}
+      {!atLimit && limit && limit.status !== "reconnect" && !known && <p className="mt-3 text-xs text-muted-foreground">Your Buffer plan may limit how many channels you can connect. Buffer will tell you if you reach it.</p>}
+      {limit?.status === "ok" && known && !atLimit && <p className="mt-3 text-xs text-muted-foreground">Channels used: {limit.orgs.map((o) => `${o.used} of ${o.limit}`).join(", ")} allowed by your Buffer plan.</p>}
       {!res && <Skeletons />}
       {res && res.status !== "ok" && <Problem status={res.status} />}
       {res?.status === "ok" && res.channels.length === 0 && (
-        <p className="mt-6 text-sm text-muted-foreground">No channels connected in Buffer yet. Connect one in Buffer, then press Refresh.</p>
+        <p className="mt-6 text-sm text-muted-foreground">No channels connected in Buffer yet. Connect one in Buffer, then press Refresh channels.</p>
       )}
       {res?.status === "ok" && res.channels.length > 0 && (
         <ul className="mt-6 divide-y divide-border rounded-2xl border border-border bg-card">

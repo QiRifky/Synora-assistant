@@ -354,3 +354,21 @@ export const createBufferIdea = createServerFn({ method: "POST" })
     clearCache(context.userId);
     return r;
   });
+
+export type ChannelLimitResult =
+  | { status: "ok"; orgs: { used: number; limit: number }[] }
+  | { status: "reconnect" }
+  | { status: "error" };
+
+// Organization.channelCount and Organization.limits.channels from the official reference.
+export const getBufferChannelLimit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(forceInput)
+  .handler(({ data, context }) => cached(`${context.userId}:channel-limit`, !!data?.force, () => guard(async () => {
+    const token = await getToken(context.userId);
+    const d = await gql(token, "query { account { organizations { channelCount limits { channels } } } }");
+    const orgs = (d?.account?.organizations ?? [])
+      .map((o: { channelCount?: number; limits?: { channels?: number } }) => ({ used: Number(o.channelCount), limit: Number(o.limits?.channels) }))
+      .filter((o: { used: number; limit: number }) => Number.isFinite(o.used) && Number.isFinite(o.limit));
+    return { status: "ok" as const, orgs };
+  }) as Promise<ChannelLimitResult>));
