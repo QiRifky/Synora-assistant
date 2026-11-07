@@ -1,4 +1,8 @@
 # Media attachments
+# Magic Photo / Photo to Post
+- [x] Add Photo to Post (vision caption + 3-5 hashtags) and Magic Photo (Clean/Warm/Bright/Calm edits) to New post.
+- [x] Separate daily limits (10 captions, 5 edits) with usage display and friendly limit messages.
+- [x] Verify both gateway calls live; UI not preview-tested (Buffer connection expired in preview).
 # Sign-in rate-limit wait
 - [x] Verify documented seconds conversion, wait thresholds and countdown lockout without changing Buffer routes.
 

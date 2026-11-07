@@ -122,6 +122,27 @@ export type Database = {
         }
         Relationships: []
       }
+      photo_usage: {
+        Row: {
+          kind: string
+          usage_date: string
+          user_id: string
+          uses: number
+        }
+        Insert: {
+          kind: string
+          usage_date: string
+          user_id: string
+          uses?: number
+        }
+        Update: {
+          kind?: string
+          usage_date?: string
+          user_id?: string
+          uses?: number
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           default_channel_id: string | null
@@ -159,12 +180,20 @@ export type Database = {
       }
       magic_caption_left: { Args: { p_user_id: string }; Returns: number }
       media_usage_bytes: { Args: { p_user_id: string }; Returns: number }
+      photo_usage_left: {
+        Args: { p_kind: string; p_user_id: string }
+        Returns: number
+      }
       protect_media_save: {
         Args: { p_operation: string; p_paths: string[]; p_user_id: string }
         Returns: undefined
       }
       refund_magic_caption_use: {
         Args: { p_user_id: string }
+        Returns: undefined
+      }
+      refund_photo_use: {
+        Args: { p_kind: string; p_user_id: string }
         Returns: undefined
       }
       release_media_references: {
@@ -174,6 +203,10 @@ export type Database = {
         }[]
       }
       try_magic_caption_use: { Args: { p_user_id: string }; Returns: string }
+      try_photo_use: {
+        Args: { p_kind: string; p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

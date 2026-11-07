@@ -10,6 +10,7 @@ import { charLimit } from "@/lib/trends.functions";
 import { magicCaption } from "@/lib/magic.functions";
 import { Sparkles, Undo2 } from "lucide-react";
 import { MediaAttachments, type AttachedMedia } from "@/components/media-attachments";
+import { PhotoTools } from "@/components/photo-tools";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -202,6 +203,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
           <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />
+          <PhotoTools media={media} setMedia={setMedia} text={text} setText={setText} limit={limit} disabled={!!busy || confirm || confirmPublish || mediaBusy} retainedPaths={retainedPaths} />
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
             <div className="mt-2 flex flex-wrap gap-2">

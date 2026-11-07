@@ -64,6 +64,13 @@
       "when": 1794019106628,
       "tag": "0008_user_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794031431531,
+      "tag": "0009_photo_tools_daily_limits",
+      "breakpoints": true
     }
   ]
 }
