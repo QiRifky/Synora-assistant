@@ -106,6 +106,20 @@ const CHANNEL_ICONS: FolderIcon[] = PLATFORMS.map((name) => ({
   node: <svg viewBox="0 0 24 24" aria-hidden="true"><path d={PLATFORM_PATHS[name]} /></svg>,
 }));
 
+// Same tile size and style as the platform marks, standing for everything else.
+const PILL_MORE = (
+  <span className="icon-folder-pill-more">
+    <span className="icon-folder-tile">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="5" cy="12" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="19" cy="12" r="2" />
+      </svg>
+    </span>
+    <span className="icon-folder-pill-tip">and more channels</span>
+  </span>
+);
+
 const TRUST = [
   { icon: HandMetal, text: "Your original photo is always kept until you choose" },
   { icon: ShieldCheck, text: "Nothing is posted automatically" },
@@ -250,11 +264,11 @@ function Index() {
               write and save posts for them.
             </p>
             <p className="mt-8 max-w-xl text-xs text-muted-foreground">
-              Available channels depend on your Buffer account and plan.
+              Synora works with the channels connected to your Buffer account.
             </p>
           </div>
           <div className="mt-12 flex min-w-0 justify-center lg:mt-0">
-            <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} />
+            <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} pillExtra={PILL_MORE} />
           </div>
         </div>
       </section>

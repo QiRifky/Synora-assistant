@@ -20,6 +20,8 @@ export type IconFolderProps = {
   defaultOpen?: boolean;
   spread?: number;
   showPill?: boolean;
+  /** Extra content rendered at the end of the small icon row, e.g. an "and more" tile. */
+  pillExtra?: React.ReactNode;
   className?: string;
 };
 
@@ -61,7 +63,7 @@ function Tile({ icon }: { icon: FolderIcon }) {
 
 export function IconFolder({
   title = "Channels", tags, icons = DEFAULT_ICONS, theme = "light",
-  defaultOpen = false, spread = 70, showPill = true, className,
+  defaultOpen = false, spread = 70, showPill = true, pillExtra, className,
 }: IconFolderProps) {
   const labels = tags ?? icons.flatMap((icon) => icon.label ? [icon.label] : []);
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -121,7 +123,7 @@ export function IconFolder({
         <ul className="relative mx-5 mt-3 flex flex-wrap gap-1.5" aria-label="Platforms">
           {labels.map((label) => <li key={label} className="icon-folder-tag" data-highlighted={highlight !== null && icons[highlight]?.label === label}>{label}</li>)}
         </ul>
-        {showPill && <span className="icon-folder-pill" aria-hidden="true">{icons.map((icon, i) => <span key={icon.label ?? i}><Tile icon={icon} /></span>)}</span>}
+        {showPill && <span className="icon-folder-pill" aria-hidden="true">{icons.map((icon, i) => <span key={icon.label ?? i}><Tile icon={icon} /></span>)}{pillExtra}</span>}
       </div>
       <Button variant="ghost" className="icon-folder-toggle" aria-label={`${title}: ${labels.join(", ")}`} aria-expanded={wide}
         onClick={() => setOpen((value) => !value)}
