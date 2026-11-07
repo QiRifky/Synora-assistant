@@ -6,7 +6,8 @@ import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSumm
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, RefreshCw, LogOut, ExternalLink, Settings } from "lucide-react";
+import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, CalendarDays, RefreshCw, LogOut, ExternalLink, Settings } from "lucide-react";
+import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 
@@ -258,11 +259,12 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-type View = "overview" | "channels" | "posts" | "ideas" | "discover" | "settings";
+type View = "overview" | "channels" | "posts" | "calendar" | "ideas" | "discover" | "settings";
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "channels", label: "Channels", icon: Radio },
   { id: "posts", label: "Posts", icon: FileText },
+  { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "discover", label: "Discover", icon: Compass },
 ];
@@ -577,6 +579,7 @@ function AppPage() {
             {view === "overview" && <OverviewView />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}
+            {view === "calendar" && <CalendarView Reconnect={() => <ReconnectButton />} onCreate={(when) => { setPrefill({ text: "", when, key: Date.now() }); setView("posts"); }} />}
             {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
             {view === "discover" && <DiscoverView />}
             {view === "settings" && <SettingsView email={email} onSignOut={signOut} />}

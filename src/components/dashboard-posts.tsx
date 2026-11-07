@@ -15,7 +15,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export type Prefill = { text: string; ideaId?: string | undefined; key: number };
+export type Prefill = { text: string; ideaId?: string | undefined; when?: string | undefined; key: number };
 
 const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
 const btn = "inline-flex h-10 items-center rounded-full border border-border px-5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50";
@@ -144,7 +144,12 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
     }).catch(() => { if (live) setChannels({ status: "error" }); });
     return () => { live = false; };
   }, [loadChannels]);
-  useEffect(() => { if (prefill) { setText(prefill.text); setIdeaId(prefill.ideaId); setRes(null); } }, [prefill]);
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.when) setWhen(prefill.when);
+    if (prefill.text || !prefill.when) { setText(prefill.text); setIdeaId(prefill.ideaId); }
+    setRes(null);
+  }, [prefill]);
 
   const list: BufferChannel[] = channels?.status === "ok" ? channels.channels : [];
   const names = useMemo(() => new Map(list.map((c) => [c.id, c.name])), [list]);

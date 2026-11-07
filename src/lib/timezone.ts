@@ -39,3 +39,22 @@ export function zonedToDate(local: string, tz: string): Date | null {
 export function formatInZone(d: Date, tz: string): string {
   return d.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short", timeZone: tz });
 }
+
+/** Calendar date key (YYYY-MM-DD) of instant `d` in `tz`. */
+export function dayKeyInZone(d: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+/** Adds `n` days to a YYYY-MM-DD key (pure calendar math). */
+export function addDays(key: string, n: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! + n)).toISOString().slice(0, 10);
+}
+
+/** Default schedule value for a day: 09:00, or the next full hour when that has passed today. */
+export function defaultSlot(key: string, todayKey: string, now: Date, tz: string): string {
+  if (key !== todayKey) return `${key}T09:00`;
+  const hour = +new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "2-digit", hourCycle: "h23" }).format(now);
+  if (hour < 9) return `${key}T09:00`;
+  return hour >= 23 ? `${addDays(key, 1)}T09:00` : `${key}T${String(hour + 1).padStart(2, "0")}:00`;
+}

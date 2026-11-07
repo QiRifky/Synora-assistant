@@ -21,6 +21,7 @@ export type PostStatus = "draft" | "scheduled" | "sent";
 export type BufferPost = {
   id: string; text: string; channelName: string; service: string;
   dueAt: string | null; sentAt: string | null; createdAt: string | null;
+  channelId?: string; thumbs?: string[];
 };
 export type PostsResult =
   | ({ status: "ok"; posts: BufferPost[]; hasMore: boolean } & Stale)
@@ -187,7 +188,7 @@ function loadAllPosts(userId: string, force: boolean): Promise<AllPosts> {
         const k = `${s}${i}`;
         decl.push(`$${k}: PostsInput!`);
         vars[k] = { organizationId: org, filter: { status: [s] }, sort };
-        parts.push(`${k}: posts(input: $${k}, first: $first) { edges { node { id text channelId channelService dueAt sentAt createdAt } } pageInfo { hasNextPage } }`);
+        parts.push(`${k}: posts(input: $${k}, first: $first) { edges { node { id text channelId channelService dueAt sentAt createdAt assets { thumbnail type } } } pageInfo { hasNextPage } }`);
       }));
       const d = await gql(token, `query(${decl.join(", ")}) { ${parts.join("\n")} }`, vars);
       orgs.forEach((_, i) => STATUSES.forEach((s) => {
@@ -198,6 +199,8 @@ function loadAllPosts(userId: string, force: boolean): Promise<AllPosts> {
           byStatus[s].posts.push({
             id: String(n.id), text: n.text ?? "", channelName: names.get(String(n.channelId)) ?? "Unknown channel",
             service: String(n.channelService ?? ""), dueAt: n.dueAt ?? null, sentAt: n.sentAt ?? null, createdAt: n.createdAt ?? null,
+            channelId: String(n.channelId ?? ""),
+            thumbs: (n.assets ?? []).map((a: { thumbnail?: string }) => a?.thumbnail).filter((t: unknown): t is string => typeof t === "string" && /^https:\/\//.test(t)).slice(0, 10),
           });
         }
       }));
