@@ -100,7 +100,7 @@ function Reconnect() {
 
 function Outcome({ res, names, success }: { res: WriteResult | null; names?: Map<string, string>; success?: string }) {
   if (!res) return null;
-  if (res.status === "reconnect") return <div className="mt-3"><p className="text-sm text-muted-foreground">Your Buffer connection has expired.</p><Reconnect /></div>;
+  if (res.status === "reconnect") return <div className="mt-3"><p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p><Reconnect /></div>;
   if (res.status === "error") return <p role="alert" className="mt-3 text-sm text-destructive">{res.message ?? "Couldn't reach Buffer. Please try again."}</p>;
   return (
     <ul className="mt-3 space-y-1">
@@ -375,7 +375,7 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
         <Outcome res={out} />
       </form>
       {!res && <div className="mt-6 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>}
-      {res?.status === "reconnect" && <div className="mt-6"><p className="text-sm text-muted-foreground">Your Buffer connection has expired.</p><Reconnect /></div>}
+      {res?.status === "reconnect" && <div className="mt-6"><p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p><Reconnect /></div>}
       {res?.status === "error" && <p role="alert" className="mt-6 text-sm text-destructive">Couldn't load your ideas from Buffer. Try Refresh in a moment.</p>}
       {res?.status === "ok" && res.ideas.length === 0 && <p className="mt-6 text-sm text-muted-foreground">No ideas in Buffer yet. Add your first one above.</p>}
       {res?.status === "ok" && res.ideas.length > 0 && (

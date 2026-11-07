@@ -291,7 +291,7 @@ function Problem({ res }: { res: { status: string; busy?: Busy } }) {
   if (res.status === "reconnect") {
     return (
       <div className="mt-6 rounded-2xl border border-border bg-card p-6">
-        <p className="text-sm text-muted-foreground">Your Buffer connection has expired or was revoked.</p>
+        <p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p>
         <ReconnectButton />
       </div>
     );

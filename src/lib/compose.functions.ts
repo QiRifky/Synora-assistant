@@ -94,7 +94,7 @@ export const saveBufferDraft = createServerFn({ method: "POST" })
       .from("buffer_connections").select("access_token, token_expires_at")
       .eq("user_id", context.userId).maybeSingle();
     if (!conn?.access_token || (conn.token_expires_at && new Date(conn.token_expires_at).getTime() < Date.now())) {
-      return { ok: false, reconnect: true, error: "Your Buffer connection has expired." };
+      return { ok: false, reconnect: true, error: "Please sign in with Buffer again." };
     }
     const res = await fetch("https://api.buffer.com", {
       method: "POST",
@@ -114,7 +114,7 @@ export const saveBufferDraft = createServerFn({ method: "POST" })
     const r = body?.data?.createPost;
     if (res.status === 401 || res.status === 403 || r?.__typename === "UnauthorizedError" ||
         body?.errors?.some((e: any) => /UNAUTH/i.test(e?.extensions?.code ?? ""))) {
-      return { ok: false, reconnect: true, error: "Your Buffer connection has expired." };
+      return { ok: false, reconnect: true, error: "Please sign in with Buffer again." };
     }
     if (r?.__typename === "PostActionSuccess") return { ok: true };
     console.error("buffer createPost failed", res.status, r?.__typename);

@@ -136,7 +136,7 @@ export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string)
       <p className="mt-2 text-xs text-muted-foreground">Times shown in {tz}. <span className="inline-block h-2 w-2 rounded-full bg-primary/60" /> Scheduled · <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/50" /> Sent</p>
 
       {stale && <p role="status" className="mt-4 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Buffer is busy, showing saved data.</p>}
-      {reconnect && <div className="mt-6 rounded-2xl border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Your Buffer connection has expired or was revoked.</p>{Reconnect()}</div>}
+      {reconnect && <div className="mt-6 rounded-2xl border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p>{Reconnect()}</div>}
       {res && !ok && !reconnect && <p role="alert" className="mt-6 text-sm text-destructive">{failedBusy ? "Buffer is receiving too many requests right now. Please wait a few minutes and try again." : "Couldn't reach Buffer right now. Please try Refresh in a moment."}</p>}
       {!res && <div className="mt-6 h-64 animate-pulse rounded-2xl bg-muted" />}
 
