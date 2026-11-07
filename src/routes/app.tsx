@@ -600,16 +600,19 @@ const BANNERS: Record<View, { title: string; caption: string }> = {
   settings: { title: "Settings", caption: "Manage your account, Buffer connection, preferences and data." },
 };
 
+const BANNER_IMAGES = import.meta.glob("../assets/banners/*.jpg", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+
 function PageBanner({ view }: { view: View }) {
   const b = BANNERS[view];
-  const Icon = NAV.find((n) => n.id === view)?.icon ?? SlidersHorizontal;
+  const img = BANNER_IMAGES[`../assets/banners/${view}.jpg`];
   return (
-    <section className="relative mb-8 overflow-hidden rounded-3xl bg-primary px-6 py-8 text-primary-foreground shadow-soft md:px-10 md:py-10">
-      <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary-foreground/10" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-16 right-24 h-40 w-40 rounded-full bg-primary-foreground/10" />
-      <Icon aria-hidden className="absolute right-8 top-1/2 hidden h-16 w-16 -translate-y-1/2 opacity-30 md:block" />
-      <h1 className="relative font-display text-3xl md:text-4xl">{b.title}</h1>
-      <p className="relative mt-2 max-w-xl text-sm opacity-90 md:text-base">{b.caption}</p>
+    <section className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-muted shadow-soft">
+      {img && <img src={img} alt="" width={1536} height={512} className="absolute inset-0 h-full w-full object-cover object-right" />}
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
+      <div className="relative px-6 py-10 md:px-10 md:py-14">
+        <h1 className="font-display text-3xl text-foreground md:text-4xl">{b.title}</h1>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground md:text-base">{b.caption}</p>
+      </div>
     </section>
   );
 }
