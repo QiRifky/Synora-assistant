@@ -6,6 +6,7 @@ import { BeforeAfter } from "@/components/before-after";
 import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
+import { Header } from "@/components/ui/header-1";
 
 const MESSAGES: Record<string, string> = {
   access_denied: "Looks like the Buffer sign-in was cancelled.",
@@ -130,7 +131,9 @@ function Index() {
   const waiting = remaining > 0;
 
   return (
-    <main id="top" className="bg-background text-foreground">
+    <div id="top" className="bg-background text-foreground">
+      <Header onSignIn={startSignIn} remaining={remaining} />
+      <main>
       <SynoraFlow
         onIntroCta={startSignIn}
         introCtaDisabled={waiting}
@@ -186,7 +189,7 @@ function Index() {
           </div>
         </section>
 
-        <section className="border-t border-border py-16 sm:py-20">
+        <section id="how-it-works" className="scroll-mt-20 border-t border-border py-16 sm:py-20">
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">How it works</h2>
           <ol className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3">
             {STEPS.map((step, index) => (
@@ -206,7 +209,7 @@ function Index() {
 
       </div>
       <div className="mx-auto w-full max-w-5xl px-6">
-        <section className="grid grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
+        <section id="channels" className="grid scroll-mt-20 grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div className="min-w-0 text-left">
             <h2 className="font-display text-3xl text-foreground sm:text-4xl">
               Works with the channels you already use in Buffer
@@ -224,7 +227,7 @@ function Index() {
           </div>
         </section>
 
-        <section className="border-t border-border py-16 sm:py-20">
+        <section id="features" className="scroll-mt-20 border-t border-border py-16 sm:py-20">
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
           <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (
@@ -264,6 +267,7 @@ function Index() {
         </section>
       </div>
 
+      </main>
       <footer className="border-t border-border py-8">
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
           <p className="max-w-md text-center text-xs sm:text-left">
@@ -275,6 +279,6 @@ function Index() {
           </div>
         </div>
       </footer>
-    </main>
+    </div>
   );
 }
