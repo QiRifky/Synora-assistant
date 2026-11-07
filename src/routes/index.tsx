@@ -17,7 +17,9 @@ const MESSAGES: Record<string, string> = {
 };
 
 const SIGN_IN_CLASS =
-  "inline-flex h-12 items-center rounded-full bg-primary px-8 text-base font-medium text-primary-foreground shadow-soft motion-safe:transition-transform motion-safe:hover:-translate-y-0.5";
+  "landing-btn inline-flex h-12 items-center px-8 text-base font-medium";
+
+const CONTAINER = "mx-auto w-full max-w-[1100px] px-6";
 
 // Example before/after pairs. Add real photo URLs here when available; a
 // missing image shows a clearly labeled placeholder instead.
@@ -77,7 +79,7 @@ const FEATURES = [
   },
 ];
 
-// Simple inline SVG marks in one calm green, matching the Synora style.
+// Simple inline SVG marks in the landing ink color.
 // Logos remain trademarks of their owners; paths via Simple Icons (CC0).
 const PLATFORM_PATHS: Record<string, string> = {
   Instagram:
@@ -131,7 +133,7 @@ function Index() {
   const waiting = remaining > 0;
 
   return (
-    <div id="top" className="bg-background text-foreground">
+    <div id="top" className="landing bg-background text-foreground">
       <Header onSignIn={startSignIn} remaining={remaining} />
       <main>
       <SynoraFlow
@@ -161,8 +163,29 @@ function Index() {
           </>
         }
       />
-      <div className="mx-auto w-full max-w-5xl px-6">
-        <section className="border-t border-border py-16 sm:py-20">
+      <section id="features" className="landing-grey scroll-mt-20 py-16 lg:py-24">
+        <div className={CONTAINER}>
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
+          <div className="feature-grid mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map((feature) => (
+              <article
+                key={feature.title}
+                tabIndex={0}
+                className="feature-card flex min-h-56 flex-col justify-between gap-8 rounded-xl border border-border bg-card p-6 text-foreground"
+              >
+                <div className="flex items-start gap-2">
+                  <feature.icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <h3 className="text-base font-semibold">{feature.title}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">{feature.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-dark py-16 lg:py-24">
+        <div className={CONTAINER}>
           <h2 className="text-center font-display text-3xl text-foreground sm:text-4xl">See the difference</h2>
           <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
             Drag the handle to compare each photo before and after Magic Photo.
@@ -180,36 +203,38 @@ function Index() {
             <h3 className="text-center font-display text-2xl text-foreground">Magic Caption</h3>
             <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
               {["Before", "After"].map((tag) => (
-                <div key={tag} className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+                <div key={tag} className="rounded-xl border border-border bg-card p-6">
                   <span className="text-xs uppercase tracking-widest text-muted-foreground">{tag}</span>
                   <p className="mt-3 text-sm text-muted-foreground">Example text coming soon</p>
                 </div>
               ))}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="how-it-works" className="scroll-mt-20 border-t border-border py-16 sm:py-20">
+      <section id="how-it-works" className="scroll-mt-20 py-16 lg:py-24">
+        <div className={CONTAINER}>
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">How it works</h2>
-          <ol className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3">
+          <ol className="mt-10 border-t border-border">
             {STEPS.map((step, index) => (
-              <li key={step.title}>
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-primary">
-                    <step.icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <span className="font-display text-2xl text-primary">{index + 1}</span>
+              <li key={step.title} className="grid grid-cols-[3rem_1fr] gap-4 border-b border-border py-6 sm:grid-cols-[6rem_1fr]">
+                <span className="font-display text-2xl text-muted-foreground">{index + 1}</span>
+                <div className="flex items-start gap-3">
+                  <step.icon className="mt-1 h-4 w-4 shrink-0 text-foreground" aria-hidden />
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">{step.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{step.body}</p>
+                  </div>
                 </div>
-                <h3 className="mt-4 text-base font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
               </li>
             ))}
           </ol>
-        </section>
+        </div>
+      </section>
 
-      </div>
-      <div className="mx-auto w-full max-w-5xl px-6">
-        <section id="channels" className="grid scroll-mt-20 grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
+      <section id="channels" className="landing-grey scroll-mt-20 py-16 lg:py-24">
+        <div className={`${CONTAINER} grid grid-cols-1 lg:grid-cols-2 lg:items-center lg:gap-16`}>
           <div className="min-w-0 text-left">
             <h2 className="font-display text-3xl text-foreground sm:text-4xl">
               Works with the channels you already use in Buffer
@@ -225,57 +250,40 @@ function Index() {
           <div className="mt-12 flex min-w-0 justify-center lg:mt-0">
             <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} />
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="features" className="scroll-mt-20 border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl border border-border bg-card p-6 shadow-soft"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-primary">
-                  <feature.icon className="h-4 w-4" aria-hidden />
-                </span>
-                <h3 className="mt-4 text-base font-semibold text-foreground">{feature.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{feature.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="border-t border-border py-16 sm:py-20">
+      <section className="landing-dark py-16 lg:py-24">
+        <div className={CONTAINER}>
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">Calm by default</h2>
-          <ul className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <ul className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3">
             {TRUST.map((point) => (
               <li key={point.text} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
-                  <point.icon className="h-4 w-4" aria-hidden />
-                </span>
+                <point.icon className="mt-0.5 h-5 w-5 shrink-0 text-foreground" aria-hidden />
                 <p className="text-sm text-foreground">{point.text}</p>
               </li>
             ))}
           </ul>
-        </section>
+        </div>
+      </section>
 
-        <section className="border-t border-border py-20 text-center sm:py-24">
+      <section className="py-16 text-center lg:py-24">
+        <div className={CONTAINER}>
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">Ready when you are.</h2>
           <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-8`}>
             Sign in with Buffer
           </Button>
-        </section>
-      </div>
-
+        </div>
+      </section>
       </main>
-      <footer className="border-t border-border py-8">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
+      <footer className="landing-dark border-t border-border py-10">
+        <div className={`${CONTAINER} flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground sm:flex-row`}>
           <p className="max-w-md text-center text-xs sm:text-left">
             Synora is an independent app that works with Buffer. Not affiliated with Buffer.
           </p>
-          <div className="flex gap-6">
-            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link to="/terms" className="hover:text-foreground">Terms</Link>
+          <div className="flex gap-6 text-foreground">
+            <Link to="/privacy" className="hover:text-brand">Privacy</Link>
+            <Link to="/terms" className="hover:text-brand">Terms</Link>
           </div>
         </div>
       </footer>

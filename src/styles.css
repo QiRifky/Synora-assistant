@@ -62,6 +62,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
 }
 
 :root {
@@ -207,3 +209,102 @@
 @media (prefers-reduced-motion: reduce) {
   .icon-folder, .icon-folder * { transition: none !important; }
 }
+
+/* ---------- Signed-out landing palette (neutral + one blue accent) ---------- */
+.landing {
+  --landing-white: #ffffff;
+  --landing-grey: #f2f2f2;
+  --landing-ink: #111111;
+  --landing-ink-card: #1a1a1a;
+  --landing-ink-hover: #2a2a2a;
+  --landing-accent: #0b63f6;
+  --background: var(--landing-white);
+  --foreground: var(--landing-ink);
+  --card: var(--landing-white);
+  --card-foreground: var(--landing-ink);
+  --popover: var(--landing-white);
+  --popover-foreground: var(--landing-ink);
+  --primary: var(--landing-ink);
+  --primary-foreground: var(--landing-white);
+  --primary-hover: var(--landing-ink-hover);
+  --secondary: var(--landing-grey);
+  --secondary-foreground: var(--landing-ink);
+  --muted: var(--landing-grey);
+  --muted-foreground: #6b7280;
+  --accent: var(--landing-grey);
+  --accent-foreground: var(--landing-ink);
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: var(--landing-accent);
+  --brand: var(--landing-accent);
+  --brand-foreground: var(--landing-white);
+  --shadow-soft: 0 10px 30px -12px rgba(17, 17, 17, 0.12);
+  /* Hero artwork */
+  --color-hero-accent: var(--landing-accent);
+  --color-hero-action: var(--landing-ink);
+  --color-hero-action-ink: var(--landing-white);
+  --color-hero-action-hover: var(--landing-ink-hover);
+  --workflow-panel-background: var(--landing-white);
+  --workflow-panel-foreground: var(--landing-ink);
+  --workflow-panel-muted: #6b7280;
+  --workflow-panel-border: #d4d4d4;
+  --workflow-canvas-background: #f7f7f7;
+  --workflow-panel-accent: var(--landing-accent);
+  --workflow-shadow-color: rgba(17, 17, 17, 0.12);
+  /* Re-resolve theme aliases the hero artwork reads directly. */
+  --color-background: var(--landing-white);
+  --color-foreground: var(--landing-ink);
+  --color-card: var(--landing-white);
+  --color-card-foreground: var(--landing-ink);
+  --color-muted-foreground: #6b7280;
+  --color-border: #e5e5e5;
+  --color-primary: var(--landing-ink);
+  --color-primary-foreground: var(--landing-white);
+  background: var(--background);
+  color: var(--foreground);
+}
+/* Grey sections: slightly deeper secondary grey keeps small text ≥4.5:1. */
+.landing-grey { background: var(--landing-grey); --background: var(--landing-grey); --muted-foreground: #5f6673; }
+.landing-dark {
+  --background: var(--landing-ink);
+  --foreground: var(--landing-white);
+  --card: var(--landing-ink-card);
+  --card-foreground: var(--landing-white);
+  --muted: var(--landing-ink-card);
+  --muted-foreground: #a3a3a3;
+  --border: #2a2a2a;
+  --primary: var(--landing-white);
+  --primary-foreground: var(--landing-ink);
+  background: var(--landing-ink);
+  color: var(--landing-white);
+}
+.landing a:focus-visible, .landing button:focus-visible, .landing input:focus-visible, .landing [tabindex]:focus-visible {
+  outline: 2px solid var(--landing-accent); outline-offset: 2px;
+}
+.landing-btn { border-radius: 4px; background: var(--landing-ink); color: var(--landing-white); box-shadow: none; }
+.landing-btn:hover:not(:disabled) { background: var(--landing-ink-hover); }
+
+/* Hero tweaks: grey second line, white nodes with ink edge, neutral divider row. */
+.landing .af-experience .ambient { background: var(--landing-white); }
+.landing .af-experience h1 em { color: #6b7280; }
+.landing .af-experience .node-face { background: var(--landing-white); border-color: var(--landing-ink); }
+.landing .af-experience .canvas { background-image: radial-gradient(#e5e5e5 1px, transparent 1px); }
+.landing .af-experience .panel-top { background: var(--landing-white); }
+.landing .af-experience .chapter-nav button { border-top-color: #e5e5e5; color: #6b7280; }
+.landing .af-experience .chapter-nav button.active, .landing .af-experience .chapter-nav button:hover { color: var(--landing-ink); }
+
+/* Feature cards: first is highlighted until another card is hovered/focused. */
+.feature-card { transition: background-color .2s ease, color .2s ease, border-color .2s ease; }
+.feature-grid:not(:has(.feature-card:hover, .feature-card:focus-visible)) .feature-card:first-child,
+.feature-card:hover, .feature-card:focus-visible {
+  background: var(--landing-accent); border-color: var(--landing-accent); color: var(--landing-white);
+  --muted-foreground: var(--landing-white); --foreground: var(--landing-white);
+}
+.feature-card:focus-visible { outline-color: var(--landing-ink) !important; }
+@media (prefers-reduced-motion: reduce) { .feature-card { transition: none; } }
+
+/* Channel folder on grey */
+.landing .icon-folder { --folder-back: #e5e5e5; --folder-front: var(--landing-white); --folder-ink: var(--landing-ink); }
+.landing .icon-folder-front { border: 1px solid #e5e5e5; }
+.landing .icon-folder-tile { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
+.landing .icon-folder-tag { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }

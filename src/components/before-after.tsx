@@ -16,7 +16,7 @@ export function BeforeAfter({ before, after, style }: { before: string | null; a
   const [pos, setPos] = useState(50);
   return (
     <figure>
-      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-muted shadow-soft">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
         {before
           ? <img src={before} alt="Product photo before Magic Photo" width={800} height={600} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
           : <div className="absolute inset-0"><Placeholder tag="Before" align="left" /></div>}
@@ -26,8 +26,8 @@ export function BeforeAfter({ before, after, style }: { before: string | null; a
             : <div className="absolute inset-0"><Placeholder tag={`After · ${style}`} align="right" /></div>}
         </div>
         <div className="pointer-events-none absolute inset-y-0" style={{ left: `${pos}%` }} aria-hidden>
-          <div className="absolute inset-y-0 -left-px w-0.5 bg-primary" />
-          <div className="absolute top-1/2 -left-4 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-xs text-primary shadow-soft">⇔</div>
+          <div className="absolute inset-y-0 -left-px w-0.5 bg-foreground" />
+          <div className="absolute top-1/2 -left-4 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-foreground text-xs text-brand">⇔</div>
         </div>
         <input
           type="range"
