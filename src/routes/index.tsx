@@ -131,40 +131,34 @@ function Index() {
 
   return (
     <main id="top" className="bg-background text-foreground">
+      <SynoraFlow
+        onIntroCta={startSignIn}
+        introCtaDisabled={waiting}
+        introExtra={
+          <>
+            {error && (
+              <div
+                role="alert"
+                className="mt-6 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm text-foreground"
+              >
+                <p>
+                  {error === "rate_limited" && retry
+                    ? `Buffer is receiving too many requests right now. ${rateLimitWaitMessage(retry)}.`
+                    : MESSAGES[error] ?? "Something went wrong while signing you in."}
+                </p>
+                {waiting && <p className="mt-2 text-xs text-muted-foreground" role="timer">Sign-in available in {waitCountdown(remaining)}</p>}
+                <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium underline underline-offset-4">
+                  Try again
+                </Button>
+              </div>
+            )}
+            <p className="mt-4 text-sm text-muted-foreground">
+              Nothing is ever published without your approval.
+            </p>
+          </>
+        }
+      />
       <div className="mx-auto w-full max-w-5xl px-6">
-        <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
-          <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
-            Write, polish and save your social posts. Calmly.
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-            Synora improves your photos, writes and refines your captions, and saves everything to Buffer as a draft.
-          </p>
-
-          {error && (
-            <div
-              role="alert"
-              className="mt-8 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm text-foreground"
-            >
-              <p>
-                {error === "rate_limited" && retry
-                  ? `Buffer is receiving too many requests right now. ${rateLimitWaitMessage(retry)}.`
-                  : MESSAGES[error] ?? "Something went wrong while signing you in."}
-              </p>
-              {waiting && <p className="mt-2 text-xs text-muted-foreground" role="timer">Sign-in available in {waitCountdown(remaining)}</p>}
-              <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium underline underline-offset-4">
-                Try again
-              </Button>
-            </div>
-          )}
-
-          <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-10`}>
-            Sign in with Buffer
-          </Button>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Nothing is ever published without your approval.
-          </p>
-        </section>
-
         <section className="border-t border-border py-16 sm:py-20">
           <h2 className="text-center font-display text-3xl text-foreground sm:text-4xl">See the difference</h2>
           <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
@@ -211,7 +205,6 @@ function Index() {
         </section>
 
       </div>
-      <SynoraFlow />
       <div className="mx-auto w-full max-w-5xl px-6">
         <section className="grid grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div className="min-w-0 text-left">

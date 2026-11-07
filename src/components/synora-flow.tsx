@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import DimensionalWorkflowHero, { type ScrollExperienceContent } from "@/components/ui/dimensional-workflow-hero";
 
 // Illustrative only: no Buffer or AI calls are made by this section.
@@ -5,10 +6,13 @@ const content: ScrollExperienceContent = {
   ariaLabel: "How Synora turns an idea into a Buffer draft",
   skip: { label: "Skip animated walkthrough", target: "#synora-flow-end" },
   intro: {
-    eyebrow: "A CALM FLOW",
-    title: { lines: ["From idea", "to a ready draft."], emphasis: "a ready draft." },
-    description: ["Write, polish and save your posts.", "You stay in control at every step."],
-    cta: "See the flow",
+    eyebrow: "SYNORA · FOR BUFFER",
+    title: { lines: ["Write, polish and save", "your social posts. Calmly."], emphasis: "Calmly." },
+    description: [
+      "Synora improves your photos, writes and refines your captions,",
+      "and saves everything to Buffer as a draft.",
+    ],
+    cta: "Sign in with Buffer",
   },
   chapters: [
     {
@@ -91,12 +95,23 @@ const content: ScrollExperienceContent = {
   footer: { disclaimer: "ILLUSTRATIVE FLOW · NOT A LIVE DASHBOARD", scrollHint: "SCROLL TO EXPLORE" },
 };
 
-export function SynoraFlow() {
+type SynoraFlowProps = {
+  /** When set, the intro button calls this (for example sign-in) instead of scrolling. */
+  onIntroCta?: () => void;
+  introCtaDisabled?: boolean;
+  /** Extra content under the intro button (error alert, reassurance line). */
+  introExtra?: ReactNode;
+};
+
+export function SynoraFlow({ onIntroCta, introCtaDisabled, introExtra }: SynoraFlowProps) {
   return (
     <>
       <DimensionalWorkflowHero
         content={content}
-        style={{ "--font-hero-display": "var(--font-display)" } as React.CSSProperties}
+        onIntroCta={onIntroCta}
+        introCtaDisabled={introCtaDisabled}
+        introExtra={introExtra}
+        style={{ "--font-hero-display": "var(--font-display)" } as CSSProperties}
       />
       <div id="synora-flow-end" tabIndex={-1} style={{ height: 1 }} />
     </>
