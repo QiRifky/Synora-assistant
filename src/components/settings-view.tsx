@@ -176,7 +176,7 @@ function PreferencesSection() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button className={primary} disabled={busy} onClick={onSave}>{busy ? "Saving…" : "Save"}</button>
-            {msg && <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-success" : "text-destructive"}`}>{msg.text}</p>}
+            {msg && <p role={msg.ok ? "status" : "alert"} className={`text-sm ${msg.ok ? "text-primary" : "text-destructive"}`}>{msg.text}</p>}
           </div>
         </div>
       )}

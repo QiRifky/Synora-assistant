@@ -39,5 +39,3 @@ use the editor.
 - Buffer reads go through `src/lib/buffer.functions.ts`: account+limits, channels and all post statuses are each one aliased GraphQL request, cached ~60s per user per kind with in-flight dedupe and last-good fallback on 429 (force=true bypasses), because Buffer rate-limits API requests.
 - Media uploads use the owner-scoped `post-media` Cloud Storage bucket; shared browser validation and authenticated server verification protect Buffer attachment inputs, and successful saves retain source files because Buffer does not guarantee ingestion before returning.
 - Hourly media cleanup uses a managed authenticated HTTP callback and service-only references; save reservations and cleanup claims share a database lock, protecting in-flight/ambiguous saves and legacy uploads from deletion.
-
-- Global typography, palette and artwork materials are defined by semantic tokens in src/styles.css; shared control variants consume them so visual changes never alter app behavior.

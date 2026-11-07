@@ -19,6 +19,3 @@
 - [x] Add per-channel media limits (strictest wins, no image/video mixing), live limit display and server enforcement.
 - [x] Add browser image compression (1440 px, ~80% quality) and 100 MB per-user storage quota with server enforcement.
 - [x] Extend hourly cleanup: delete files of sent posts after 7 days and files of deleted drafts; bucket limit raised to 20 MB.
-# Shared visual restyle
-- [x] Apply shared typography, slate palette, landing-only dots and neutral artwork/favicon.
-- [x] Verify desktop/mobile, reduced motion and signed-in styling without service calls (data requests blocked for visual checks).

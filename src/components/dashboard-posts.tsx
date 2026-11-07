@@ -105,7 +105,7 @@ function Outcome({ res, names, success }: { res: WriteResult | null; names?: Map
   return (
     <ul className="mt-3 space-y-1">
       {res.results.map((r, i) => (
-        <li key={i} role={r.ok ? "status" : "alert"} className={`text-sm ${r.ok ? "text-success" : "text-destructive"}`}>
+        <li key={i} role={r.ok ? "status" : "alert"} className={`text-sm ${r.ok ? "text-foreground" : "text-destructive"}`}>
           {names?.get(r.channelId) ? `${names.get(r.channelId)}: ` : ""}{r.ok ? (success ?? r.message) : r.message}
         </li>
       ))}
