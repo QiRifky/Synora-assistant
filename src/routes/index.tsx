@@ -219,8 +219,7 @@ function Index() {
               write and save posts for them.
             </p>
             <p className="mt-8 max-w-xl text-xs text-muted-foreground">
-              Available channels depend on your Buffer account and plan. Synora is not affiliated with
-              or endorsed by these platforms.
+              Available channels depend on your Buffer account and plan.
             </p>
           </div>
           <div className="mt-12 flex min-w-0 justify-center lg:mt-0">
