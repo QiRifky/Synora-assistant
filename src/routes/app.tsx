@@ -363,7 +363,7 @@ function ChannelsView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-3xl text-foreground">Channels</h1>
         <div className="flex flex-wrap gap-2">
-          <a href="https://publish.buffer.com" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm text-primary-foreground hover:opacity-90">
+          <a href="https://publish.buffer.com/settings/channels" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm text-primary-foreground hover:opacity-90">
             <ExternalLink className="h-4 w-4" /> Connect a new channel
           </a>
           <button onClick={refresh} disabled={busy} className="inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm text-foreground hover:bg-muted disabled:opacity-50">
@@ -371,7 +371,7 @@ function ChannelsView() {
           </button>
         </div>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">Connect your channel in Buffer, then come back and click Refresh.</p>
+      <p className="mt-3 text-sm text-muted-foreground">Buffer opens in a new tab. Click 'Connect a channel', choose your network, then come back here and click Refresh.</p>
       {atLimit && <p role="status" className="mt-3 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Your Buffer plan allows a limited number of channels. You've reached it, so remove a channel or upgrade in Buffer to add another.</p>}
       {!atLimit && limit && limit.status !== "reconnect" && !known && <p className="mt-3 text-xs text-muted-foreground">Your Buffer plan may limit how many channels you can connect. Buffer will tell you if you reach it.</p>}
       {limit?.status === "ok" && known && !atLimit && <p className="mt-3 text-xs text-muted-foreground">Channels used: {limit.orgs.map((o) => `${o.used} of ${o.limit}`).join(", ")} allowed by your Buffer plan.</p>}
