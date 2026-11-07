@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SynoraFlow } from "@/components/synora-flow";
-import { BeforeAfter } from "@/components/before-after";
 import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
@@ -25,11 +24,37 @@ const SIGN_IN_CLASS =
 
 const CONTAINER = "landing-container";
 
-// Example before/after pairs. Add real photo URLs here when available; a
-// missing image shows a clearly labeled placeholder instead.
-const SHOWCASE: { style: string; before: string | null; after: string | null }[] = [
-  { style: "Clean", before: null, after: null },
-  { style: "Calm", before: null, after: null },
+const USE_CASES = [
+  {
+    title: "Small shop owners",
+    text: "You take your own product photos. Synora helps you make them look clean and writes a caption you can review before anything is saved.",
+    icon: (
+      <>
+        <path d="M6 7h12l1 13H5L6 7Z" />
+        <path d="M9 10V6a3 3 0 0 1 6 0v4" />
+      </>
+    ),
+  },
+  {
+    title: "Creators posting in more than one place",
+    text: "You share across several channels. Polish your caption once and save it to Buffer as a draft, ready for you to check.",
+    icon: (
+      <>
+        <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+        <path d="m3 13 9 5 9-5" />
+      </>
+    ),
+  },
+  {
+    title: "Anyone who wants tidy captions",
+    text: "You know what you want to say but not how to word it. Magic Caption polishes your text and keeps your meaning, links and hashtags.",
+    icon: (
+      <>
+        <path d="M4 7h16M4 12h10M4 17h7" />
+        <path d="m15 19 5-5-2-2-5 5v2h2Z" />
+      </>
+    ),
+  },
 ];
 
 const STEPS = [
@@ -195,30 +220,25 @@ function Index() {
 
       <section className="landing-dark py-16 lg:py-24">
         <div className={CONTAINER}>
-          <h2 className="text-center font-display text-3xl text-foreground sm:text-4xl">See the difference</h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
-            Drag the handle to compare each photo before and after Magic Photo.
+          <h2 className="text-center font-display text-3xl text-foreground sm:text-4xl">Made for everyday posting</h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-base text-[#A3A3A3]">
+            Real situations Synora is built for.
           </p>
-          <div className="mx-auto mt-10 grid max-w-3xl grid-cols-1 gap-8 sm:grid-cols-2">
-            {SHOWCASE.map((item) => (
-              <BeforeAfter key={item.style} before={item.before} after={item.after} style={item.style} />
+          <ul className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {USE_CASES.map((c) => (
+              <li
+                key={c.title}
+                className="flex h-full flex-col rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] p-6 transition-colors duration-150 hover:border-[#0B63F6] focus-within:border-[#0B63F6] motion-reduce:transition-none"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  {c.icon}
+                </svg>
+                <h3 className="mt-4 font-sans text-lg font-semibold text-[#FFFFFF]">{c.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#A3A3A3]">{c.text}</p>
+              </li>
             ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Real results from Synora's Magic Photo. Your results may vary.
-          </p>
-
-          <div className="mx-auto mt-12 max-w-3xl">
-            <h3 className="text-center font-display text-2xl text-foreground">Magic Caption</h3>
-            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-              {["Before", "After"].map((tag) => (
-                <div key={tag} className="rounded-xl border border-border bg-card p-6">
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground">{tag}</span>
-                  <p className="mt-3 text-sm text-muted-foreground">Example text coming soon</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          </ul>
+          <p className="mt-8 text-center text-sm text-[#A3A3A3]">Nothing is published until you decide.</p>
         </div>
       </section>
 
