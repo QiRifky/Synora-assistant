@@ -11,6 +11,7 @@ import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 import synoraLogo from "@/assets/synora-logo.png.asset.json";
+import { SynoraLogo } from "@/components/synora-logo";
 
 import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
 
@@ -520,7 +521,7 @@ function AppSidebar({ view, setView, email, onSignOut }: { view: View; setView: 
   return (
     <Sidebar>
       <SidebarHeader className="px-4 py-5">
-        <img src={synoraLogo.url} alt="Synora" className="h-7 w-auto self-start" />
+        <SynoraLogo className="self-start" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
