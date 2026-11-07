@@ -209,21 +209,23 @@ function Index() {
           </ol>
         </section>
 
-        <section className="border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">
-            Works with the channels you already use in Buffer
-          </h2>
-          <p className="mt-4 max-w-xl text-base text-muted-foreground">
-            Buffer connects to many social platforms. Connect them in Buffer, and Synora helps you
-            write and save posts for them.
-          </p>
-          <div className="mt-12 flex justify-center">
+        <section className="grid grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
+          <div className="min-w-0 text-left">
+            <h2 className="font-display text-3xl text-foreground sm:text-4xl">
+              Works with the channels you already use in Buffer
+            </h2>
+            <p className="mt-4 max-w-xl text-base text-muted-foreground">
+              Buffer connects to many social platforms. Connect them in Buffer, and Synora helps you
+              write and save posts for them.
+            </p>
+            <p className="mt-8 max-w-xl text-xs text-muted-foreground">
+              Available channels depend on your Buffer account and plan. Synora is not affiliated with
+              or endorsed by these platforms.
+            </p>
+          </div>
+          <div className="mt-12 flex min-w-0 justify-center lg:mt-0">
             <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} />
           </div>
-          <p className="mt-8 max-w-xl text-xs text-muted-foreground">
-            Available channels depend on your Buffer account and plan. Synora is not affiliated with
-            or endorsed by these platforms.
-          </p>
         </section>
 
         <section className="border-t border-border py-16 sm:py-20">
