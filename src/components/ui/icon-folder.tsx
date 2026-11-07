@@ -91,7 +91,9 @@ export function IconFolder({
 
   const gap = Math.min(spread * (wide ? 1.15 : 1), Math.max(0, width - 104) / Math.max(1, icons.length - 1));
   return (
-    <div ref={rootRef} className={cn("icon-folder", className)} data-theme={theme} data-shown={shown} data-open={wide}>
+    <div ref={rootRef} className={cn("icon-folder", className)} data-theme={theme} data-shown={shown} data-open={wide}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse") setHover(true); }}
+      onPointerLeave={() => { setHover(false); setHighlight(null); }}>
       <div ref={backRef} className="icon-folder-back" style={{ clipPath: backD ? `path('${backD}')` : undefined }} aria-hidden="true">
         <svg className="absolute inset-0 h-full w-full" aria-hidden="true"><path d={backD} fill="none" stroke="var(--border)" strokeWidth="2" /></svg>
       </div>
@@ -105,7 +107,7 @@ export function IconFolder({
               zIndex: highlight === i ? 5 : undefined,
               transitionDelay: `${i * 0.035}s`,
             }}>
-              <div className="icon-folder-icon-inner" onPointerEnter={(e) => { if (e.pointerType === "mouse") setHighlight(i); }} onPointerLeave={() => setHighlight(null)} style={{ transform: highlight === i ? `translateY(-18px) rotate(${-rotation}deg)` : undefined }}>
+              <div className="icon-folder-icon-inner" style={{ transform: highlight === i ? `translateY(-26px) rotate(${-rotation}deg) scale(1.1)` : highlight !== null ? "scale(.96)" : undefined, filter: highlight !== null && highlight !== i ? "saturate(.75) brightness(.85)" : undefined }}>
                 <Tile icon={icon} />
                 {icon.label && <span className="icon-folder-tooltip" data-visible={highlight === i}>{icon.label}</span>}
               </div>
@@ -117,14 +119,24 @@ export function IconFolder({
         <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true"><path d={frontD} fill="none" stroke="var(--border)" strokeWidth="2" /></svg>
         <h3 className="relative m-0 px-5 pt-9 font-display text-2xl leading-8">{title}</h3>
         <ul className="relative mx-5 mt-3 flex flex-wrap gap-1.5" aria-label="Platforms">
-          {labels.map((label) => <li key={label} className="icon-folder-tag">{label}</li>)}
+          {labels.map((label) => <li key={label} className="icon-folder-tag" data-highlighted={highlight !== null && icons[highlight]?.label === label}>{label}</li>)}
         </ul>
         {showPill && <span className="icon-folder-pill" aria-hidden="true">{icons.map((icon, i) => <span key={icon.label ?? i}><Tile icon={icon} /></span>)}</span>}
       </div>
       <Button variant="ghost" className="icon-folder-toggle" aria-label={`${title}: ${labels.join(", ")}`} aria-expanded={wide}
         onClick={() => setOpen((value) => !value)}
-        onPointerEnter={(e) => { if (e.pointerType === "mouse") setHover(true); }}
-        onPointerLeave={() => { setHover(false); setHighlight(null); }} />
+        onPointerMove={(e) => {
+          if (e.pointerType !== "mouse") return;
+          // The accessible button overlays the artwork. Hit-test visible tiles
+          // here so it doesn't block their individual hover effects.
+          const tiles = rootRef.current?.querySelectorAll<HTMLElement>(".icon-folder-icon");
+          let active: number | null = null;
+          tiles?.forEach((tile, index) => {
+            const bounds = tile.getBoundingClientRect();
+            if (e.clientX >= bounds.left && e.clientX <= bounds.right && e.clientY >= bounds.top && e.clientY <= bounds.bottom) active = index;
+          });
+          setHighlight(active);
+        }} />
     </div>
   );
 }
