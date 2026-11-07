@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
+import { ImagePlus, Wand2, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BeforeAfter } from "@/components/before-after";
 import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
+import SynoraWorkflowHero from "@/components/ui/dimensional-workflow-hero-demo";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
 
@@ -22,24 +23,6 @@ const SIGN_IN_CLASS =
 const SHOWCASE: { style: string; before: string | null; after: string | null }[] = [
   { style: "Clean", before: null, after: null },
   { style: "Calm", before: null, after: null },
-];
-
-const STEPS = [
-  {
-    icon: ImagePlus,
-    title: "Upload a photo",
-    body: "Add a product or lifestyle photo to a new post.",
-  },
-  {
-    icon: Wand2,
-    title: "Improve and write",
-    body: "Use Magic Photo, Photo to Post or Magic Caption, only when you tap them.",
-  },
-  {
-    icon: Save,
-    title: "Review and save to Buffer",
-    body: "Read everything, change what you like, then save it to Buffer as a draft.",
-  },
 ];
 
 const FEATURES = [
@@ -131,7 +114,7 @@ function Index() {
   return (
     <main className="bg-background text-foreground">
       <div className="mx-auto w-full max-w-5xl px-6">
-        <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
+        <section id="sign-in" className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
           <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
             Write, polish and save your social posts. Calmly.
           </h1>
@@ -191,24 +174,11 @@ function Index() {
           </div>
         </section>
 
-        <section className="border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">How it works</h2>
-          <ol className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3">
-            {STEPS.map((step, index) => (
-              <li key={step.title}>
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-primary">
-                    <step.icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <span className="font-display text-2xl text-primary">{index + 1}</span>
-                </div>
-                <h3 className="mt-4 text-base font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
+      </div>
 
+      <SynoraWorkflowHero />
+
+      <div className="mx-auto w-full max-w-5xl px-6">
         <section className="grid grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div className="min-w-0 text-left">
             <h2 className="font-display text-3xl text-foreground sm:text-4xl">
@@ -227,7 +197,7 @@ function Index() {
           </div>
         </section>
 
-        <section className="border-t border-border py-16 sm:py-20">
+        <section id="features" tabIndex={-1} className="border-t border-border py-16 sm:py-20">
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
           <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (
