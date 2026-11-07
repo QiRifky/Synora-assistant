@@ -207,8 +207,9 @@ export function NewPost({ prefill, onDone, studio = false }: { prefill: Prefill 
           {(!studio || media.length > 0) && <>
           {studio && <h3 className="pt-2 text-xs uppercase tracking-widest text-muted-foreground">Your post</h3>}
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
+          {!studio && <MediaAttachments compact value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />}
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
-          {!studio && <>
+          {false && <>
           <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />
           </>}
           <fieldset>

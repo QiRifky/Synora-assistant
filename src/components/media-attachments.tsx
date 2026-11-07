@@ -69,8 +69,8 @@ async function compressImage(file: File): Promise<{ file: File; note: string | n
   }
 }
 
-export function MediaAttachments({ value, onChange, onBusy, disabled = false, imagesOnly = false, retainedPaths, channels, onViolation, studio = false }: {
-  value: AttachedMedia[]; onChange: (v: AttachedMedia[]) => void; onBusy: (v: boolean) => void; disabled?: boolean; imagesOnly?: boolean; retainedPaths?: Set<string>; studio?: boolean;
+export function MediaAttachments({ value, onChange, onBusy, disabled = false, imagesOnly = false, retainedPaths, channels, onViolation, studio = false, compact = false }: {
+  value: AttachedMedia[]; onChange: (v: AttachedMedia[]) => void; onBusy: (v: boolean) => void; disabled?: boolean; imagesOnly?: boolean; retainedPaths?: Set<string>; studio?: boolean; compact?: boolean;
   channels?: ChannelInfo[]; onViolation?: (message: string | null) => void;
 }) {
   const checkAvailability = useServerFn(getMediaAvailability);
@@ -207,6 +207,26 @@ export function MediaAttachments({ value, onChange, onBusy, disabled = false, im
       {editing && <ImageEditor media={editing} busy={busy || disabled} onClose={() => { if (!busy) setEditing(null); }} onSave={replace} />}
     </div>;
   }
+
+  if (compact) return <div className="space-y-3">
+    <div className="relative z-10 -mt-12 flex h-9 justify-end pr-2">
+      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" title="Add media" aria-label="Add media" disabled={busy || disabled || available === false || value.length >= activeMax} onClick={() => picker.current?.click()}><ImagePlus /></Button>
+    </div>
+    <input ref={picker} className="sr-only" type="file" multiple accept={imagesOnly ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,video/mp4"} aria-label="Media files" disabled={busy || disabled} onChange={(e) => { void add(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+    {progress && <div role="status" className="space-y-1"><p className="break-words text-xs text-muted-foreground">Uploading {progress.name} · {progress.percent}%</p><progress className="h-2 w-full accent-primary" max={100} value={progress.percent} aria-label="Upload progress" /></div>}
+    {value.length > 0 && <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+      {value.map((m) => <li key={m.path} className="relative min-w-0 rounded-lg border border-border p-1">
+        {m.type === "image" ? <img src={m.preview} alt={m.file.name} className="aspect-square w-full rounded-md object-cover" /> : <video src={m.preview} preload="metadata" className="aspect-square w-full rounded-md object-cover" />}
+        <div className="mt-1 flex justify-end gap-1">
+          {m.type === "image" && <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${m.file.name}`} disabled={busy || disabled} onClick={() => setEditing(m)}><Pencil /></Button>}
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Remove ${m.file.name}`} disabled={busy || disabled} onClick={() => void remove(m)}><X /></Button>
+        </div>
+      </li>)}
+    </ul>}
+    {violation && <p role="alert" className="text-sm text-destructive">{violation}</p>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {editing && <ImageEditor media={editing} busy={busy || disabled} onClose={() => { if (!busy) setEditing(null); }} onSave={replace} />}
+  </div>;
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
