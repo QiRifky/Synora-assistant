@@ -606,10 +606,10 @@ function PageBanner({ view }: { view: View }) {
   const b = BANNERS[view];
   const img = BANNER_IMAGES[`../assets/banners/${view}.jpg`];
   return (
-    <section className="relative w-full overflow-hidden bg-muted">
+    <section className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-muted shadow-soft">
       {img && <img src={img} alt="" width={1536} height={512} className="absolute inset-0 h-full w-full object-cover object-right" />}
       <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
-      <div className="relative mx-auto w-full max-w-6xl px-5 py-12 md:px-10 md:py-20">
+      <div className="relative px-6 py-10 md:px-10 md:py-14">
         <h1 className="font-display text-3xl text-foreground md:text-4xl">{b.title}</h1>
         <p className="mt-2 max-w-md text-sm text-muted-foreground md:text-base">{b.caption}</p>
       </div>
@@ -635,14 +635,14 @@ function AppPage() {
       <div className="flex min-h-screen w-full bg-background">
         <SidebarNav groups={NAV_GROUPS} activeId={view} onSelect={setView} settingsId="settings" email={email} onSignOut={signOut} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-14 shrink-0 items-center gap-3 px-4 md:hidden">
+          <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-10">
             <div className="flex min-w-0 items-center gap-3">
               <SidebarTrigger title="Toggle navigation" className="md:hidden" />
               <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto md:hidden" />
             </div>
           </header>
-          <PageBanner view={view} />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8 md:px-10 md:py-10">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-9 md:px-10 md:py-12">
+            <PageBanner view={view} />
             {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} userId={user.id} />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}
