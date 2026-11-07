@@ -210,7 +210,6 @@ export function NewPost({ prefill, onDone, studio = false }: { prefill: Prefill 
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
           {!studio && <>
           <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />
-          <PhotoTools media={media} setMedia={setMedia} text={text} setText={setText} limit={limit} disabled={!!busy || confirm || confirmPublish || mediaBusy} retainedPaths={retainedPaths} />
           </>}
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
