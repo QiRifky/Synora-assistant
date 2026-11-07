@@ -7,7 +7,7 @@ import { getDashboardData, type DashboardData } from "@/lib/dashboard.functions"
 import { formatBytes } from "@/lib/media-limits";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SidebarNav, type NavGroupData } from "@/components/ui/dashboard-sidebar";
-import { Sparkles, CalendarClock, SlidersHorizontal } from "lucide-react";
+import { Sparkles, CalendarClock, SlidersHorizontal, Image as ImageIcon, Wand2, Hash } from "lucide-react";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Radio, FileText, FileEdit, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
@@ -264,7 +264,7 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-export type View = "overview" | "channels" | "posts" | "drafts" | "calendar" | "ideas" | "discover" | "settings";
+export type View = "overview" | "channels" | "posts" | "drafts" | "calendar" | "ideas" | "discover" | "photo" | "settings";
 export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "channels", label: "Channels", icon: Radio },
@@ -273,12 +273,13 @@ export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "discover", label: "Discover", icon: Compass },
+  { id: "photo", label: "Photo Studio", icon: ImageIcon },
 ];
 
 const navItem = (id: View) => { const n = NAV.find((x) => x.id === id)!; return { id: n.id, title: n.label, icon: n.icon }; };
 const NAV_GROUPS: NavGroupData<View>[] = [
   { items: [navItem("overview")] },
-  { heading: "Create", icon: Sparkles, items: [navItem("ideas"), navItem("discover")] },
+  { heading: "Create", icon: Sparkles, items: [navItem("photo"), navItem("ideas"), navItem("discover")] },
   { heading: "Plan & Ship", icon: CalendarClock, items: [navItem("posts"), navItem("drafts"), navItem("calendar")] },
   { heading: "Set up", icon: SlidersHorizontal, items: [navItem("channels")] },
 ];
@@ -753,6 +754,28 @@ function PostList({ status, version }: { status: PostStatus; version: number }) 
   );
 }
 
+function PhotoStudioView() {
+  const tools = [
+    { icon: Hash, title: "Photo to Post", text: "Writes a caption and 3–5 hashtags from your photo. Up to 10 a day." },
+    { icon: Wand2, title: "Magic Photo", text: "Clean, Warm, Bright or Calm edits with a before/after view and Undo. Up to 5 a day." },
+  ];
+  return (
+    <>
+      <PageHeader title="Photo Studio" />
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Add one photo below to unlock both tools. Nothing is published until you decide.</p>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        {tools.map((t) => (
+          <div key={t.title} className="flex gap-3 rounded-xl border border-border bg-card p-4">
+            <t.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div><p className="text-sm font-medium text-foreground">{t.title}</p><p className="mt-1 text-xs text-muted-foreground">{t.text}</p></div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-6"><NewPost prefill={null} onDone={() => {}} /></div>
+    </>
+  );
+}
+
 function PostsView({ prefill }: { prefill: Prefill | null }) {
   const [version, setVersion] = useState(0);
   return (
@@ -841,6 +864,7 @@ function AppPage() {
             {view === "calendar" && <CalendarView Reconnect={() => <ReconnectButton />} onCreate={(when) => { setPrefill({ text: "", when, key: Date.now() }); setView("posts"); }} />}
             {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
             {view === "discover" && <DiscoverView />}
+            {view === "photo" && <PhotoStudioView />}
             {view === "settings" && <SettingsView email={email} onSignOut={signOut} />}
           </main>
           <footer className="mx-5 mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border py-6 text-xs text-muted-foreground md:mx-10">
