@@ -89,7 +89,6 @@ const content: ScrollExperienceContent = {
   finale: {
     eyebrow: "CALM CLARITY",
     title: { lines: ["Your posts, ready.", "You stay in control."], emphasis: "You stay in control." },
-    cta: { label: "Back to top", href: "#top" },
   },
   navLabel: "Choose a step",
   footer: { disclaimer: "ILLUSTRATIVE FLOW · NOT A LIVE DASHBOARD", scrollHint: "SCROLL TO EXPLORE" },

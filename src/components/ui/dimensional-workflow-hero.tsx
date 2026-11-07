@@ -115,7 +115,7 @@ export type ScrollExperienceContent = {
   finale: {
     eyebrow: string;
     title: EmphasisText;
-    cta: { label: string; href: string };
+    cta?: { label: string; href: string } | undefined;
   };
   navLabel: string;
   footer: { disclaimer: string; scrollHint: string };
@@ -874,9 +874,11 @@ export default function DimensionalWorkflowHero({ content, motion, accent, class
             <h2>
               <RichLines text={content.finale.title} />
             </h2>
-            <a className="primary" href={content.finale.cta.href}>
-              {content.finale.cta.label} <span aria-hidden="true">↗</span>
-            </a>
+            {content.finale.cta && (
+              <a className="primary" href={content.finale.cta.href}>
+                {content.finale.cta.label} <span aria-hidden="true">↗</span>
+              </a>
+            )}
           </div>
           <nav className="chapter-nav" aria-label={content.navLabel}>
             {chapters.map((chapter, i) => (
