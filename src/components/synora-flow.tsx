@@ -91,7 +91,7 @@ const content: ScrollExperienceContent = {
     title: { lines: ["Your posts, ready.", "You stay in control."], emphasis: "You stay in control." },
   },
   navLabel: "Choose a step",
-  footer: { disclaimer: "ILLUSTRATIVE FLOW · NOT A LIVE DASHBOARD", scrollHint: "SCROLL TO EXPLORE" },
+  footer: { disclaimer: " · ILLUSTRATIVE FLOW", scrollHint: "SCROLL TO EXPLORE" },
 };
 
 type SynoraFlowProps = {
