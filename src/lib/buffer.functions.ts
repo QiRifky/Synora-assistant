@@ -455,3 +455,64 @@ export const getBufferChannelLimit = createServerFn({ method: "POST" })
     const orgs = r.orgs.flatMap((o) => (o.used !== null && o.limit !== null ? [{ used: o.used, limit: o.limit }] : []));
     return { status: "ok", orgs, ...(r.stale ? { stale: r.stale } : {}) };
   });
+
+// ---------- Settings: connection status and local data removal (never touches the Buffer account) ----------
+
+function forgetUser(userId: string) {
+  for (const m of [cache, lastGood] as Map<string, unknown>[]) for (const k of [...m.keys()]) if (k.startsWith(`${userId}:`)) m.delete(k);
+}
+
+export type ConnectionStatus = { status: "connected" | "reconnect"; channelCount: number | null; channels: BufferChannel[] | null };
+
+/** Reads only stored connection metadata and already-cached channels; makes no Buffer API request. */
+export const getBufferConnectionStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ConnectionStatus> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: conn } = await supabaseAdmin
+      .from("buffer_connections").select("token_expires_at").eq("user_id", context.userId).maybeSingle();
+    const expired = !!conn?.token_expires_at && new Date(conn.token_expires_at).getTime() < Date.now();
+    const known = (cache.get(`${context.userId}:channels`)?.value ?? lastGood.get(`${context.userId}:channels`)) as ChannelsResult | undefined;
+    const channels = known?.status === "ok" ? known.channels : null;
+    return { status: conn && !expired ? "connected" : "reconnect", channelCount: channels?.length ?? null, channels };
+  });
+
+export const disconnectBuffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ ok: boolean }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("buffer_connections").delete().eq("user_id", context.userId);
+    forgetUser(context.userId);
+    if (error) console.error("disconnect buffer failed", error.code);
+    return { ok: !error };
+  });
+
+/** Removes Synora-side data only: preferences, uploaded files, usage counters, media references and Buffer tokens. */
+export const deleteMySynoraData = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ confirm: z.literal("DELETE") }).parse(d))
+  .handler(async ({ context }): Promise<{ ok: boolean }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const uid = context.userId;
+    let ok = true;
+    const bucket = supabaseAdmin.storage.from(MEDIA_BUCKET);
+    for (let round = 0; round < 50; round++) {
+      const { data: files, error } = await bucket.list(uid, { limit: 100 });
+      if (error) { ok = false; break; }
+      const paths = (files ?? []).filter((f) => f.name).map((f) => `${uid}/${f.name}`).filter((p) => ownsMedia(p, uid));
+      if (!paths.length) break;
+      const { error: rmErr } = await bucket.remove(paths);
+      if (rmErr) { ok = false; break; }
+      await supabaseAdmin.from("media_cleanup_claims").delete().in("path", paths);
+    }
+    const steps = await Promise.all([
+      supabaseAdmin.from("media_references").delete().eq("user_id", uid),
+      supabaseAdmin.from("magic_caption_usage").delete().eq("user_id", uid),
+      supabaseAdmin.from("user_preferences").delete().eq("user_id", uid),
+      supabaseAdmin.from("buffer_connections").delete().eq("user_id", uid),
+    ]);
+    if (steps.some((s) => s.error)) ok = false;
+    forgetUser(uid);
+    if (!ok) console.error("delete synora data incomplete");
+    return { ok };
+  });

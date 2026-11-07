@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { loadPreferences } from "@/lib/preferences-client";
+import { browserTimeZone, formatInZone, isValidTimeZone, zonedToDate } from "@/lib/timezone";
 import { useServerFn } from "@tanstack/react-start";
 import {
   createBufferPosts, editBufferDraft, deleteBufferDraft, getBufferChannels, getBufferIdeas, createBufferIdea,
@@ -42,7 +44,11 @@ function MagicBar({ text, setText, limit, limitNote }: { text: string; setText: 
 
   useEffect(() => {
     const saved = window.localStorage.getItem(MAGIC_STYLE_KEY);
-    if (saved && MAGIC_STYLES.some(([v]) => v === saved)) setStyle(saved as MagicStyle);
+    if (saved && MAGIC_STYLES.some(([v]) => v === saved)) { setStyle(saved as MagicStyle); return; }
+    // No browser choice yet: use the default style saved in Settings.
+    let live = true;
+    loadPreferences().then((p) => { if (live && p) setStyle(p.magicStyle); });
+    return () => { live = false; };
   }, []);
 
   function pickStyle(v: MagicStyle) {
@@ -125,7 +131,19 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const [mediaViolation, setMediaViolation] = useState<string | null>(null);
   const [retainedPaths, setRetainedPaths] = useState<Set<string>>(new Set());
 
-  useEffect(() => { loadChannels({ data: {} }).then(setChannels).catch(() => setChannels({ status: "error" })); }, [loadChannels]);
+  const [tz, setTz] = useState(browserTimeZone);
+  useEffect(() => {
+    let live = true;
+    Promise.all([loadChannels({ data: {} }), loadPreferences()]).then(([ch, prefs]) => {
+      if (!live) return;
+      setChannels(ch);
+      if (prefs?.timeZone && isValidTimeZone(prefs.timeZone)) setTz(prefs.timeZone);
+      if (prefs?.defaultChannelId && ch.status === "ok" && ch.channels.some((c) => c.id === prefs.defaultChannelId)) {
+        setSelected((cur) => (cur.length ? cur : [prefs.defaultChannelId!]));
+      }
+    }).catch(() => { if (live) setChannels({ status: "error" }); });
+    return () => { live = false; };
+  }, [loadChannels]);
   useEffect(() => { if (prefill) { setText(prefill.text); setIdeaId(prefill.ideaId); setRes(null); } }, [prefill]);
 
   const list: BufferChannel[] = channels?.status === "ok" ? channels.channels : [];
@@ -134,9 +152,8 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
   const limit = chosen.length ? Math.min(...chosen.map((c) => charLimit(c.service))) : 0;
   const tightest = chosen.find((c) => charLimit(c.service) === limit);
   const over = limit > 0 && text.length > limit;
-  const dueDate = when ? new Date(when) : null;
+  const dueDate = when ? zonedToDate(when, tz) : null;
   const dueValid = !!dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() > Date.now() + 60_000;
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const canSend = !!text.trim() && chosen.length > 0 && !over && !busy && !mediaBusy && !mediaViolation;
 
   const canPublish = (!!text.trim() || media.length > 0) && chosen.length > 0 && !over && !busy && !mediaBusy && !mediaViolation;
@@ -166,7 +183,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
     busyRef.current = false;
     setBusy(null);
   }
-  const successMsg = { publish: "Sent to Buffer for immediate publishing.", draft: "Saved as a draft in Buffer.", queue: "Added to your Buffer queue.", schedule: `Scheduled for ${dueDate?.toLocaleString() ?? ""}.` }[lastAction as "draft"];
+  const successMsg = { publish: "Sent to Buffer for immediate publishing.", draft: "Saved as a draft in Buffer.", queue: "Added to your Buffer queue.", schedule: `Scheduled for ${dueDate ? formatInZone(dueDate, tz) : ""} (${tz}).` }[lastAction as "draft"];
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -219,7 +236,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
           <div className="space-y-3 text-sm">
             <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border p-3 text-foreground">{text}</p>
             <p><span className="text-muted-foreground">Channels: </span>{chosen.map((c) => `${c.name} (${c.service})`).join(", ")}</p>
-            <p><span className="text-muted-foreground">When: </span>{dueDate?.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })} ({tz})</p>
+            <p><span className="text-muted-foreground">When: </span>{dueDate ? formatInZone(dueDate, tz) : ""} ({tz})</p>
             {media.length > 0 && <p><span className="text-muted-foreground">Media: </span>{media.map((m) => m.file.name).join(", ")}</p>}
           </div>
           <AlertDialogFooter>

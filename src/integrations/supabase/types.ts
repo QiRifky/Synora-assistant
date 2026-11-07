@@ -122,6 +122,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          default_channel_id: string | null
+          magic_style: string
+          time_zone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          default_channel_id?: string | null
+          magic_style?: string
+          time_zone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          default_channel_id?: string | null
+          magic_style?: string
+          time_zone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

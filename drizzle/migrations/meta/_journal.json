@@ -57,6 +57,13 @@
       "when": 1794000152623,
       "tag": "0007_media_quota_and_sent_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794019106628,
+      "tag": "0008_user_preferences",
+      "breakpoints": true
     }
   ]
 }

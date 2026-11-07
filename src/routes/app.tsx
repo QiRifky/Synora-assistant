@@ -6,7 +6,8 @@ import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSumm
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, RefreshCw, LogOut, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, RefreshCw, LogOut, ExternalLink, Settings } from "lucide-react";
+import { SettingsView } from "@/components/settings-view";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 
 import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
@@ -257,7 +258,7 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-type View = "overview" | "channels" | "posts" | "ideas" | "discover";
+type View = "overview" | "channels" | "posts" | "ideas" | "discover" | "settings";
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "channels", label: "Channels", icon: Radio },
@@ -534,6 +535,13 @@ function AppSidebar({ view, setView, email, onSignOut }: { view: View; setView: 
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton isActive={view === "settings"} onClick={() => { setView("settings"); setOpenMobile(false); }}>
+              <Settings className="h-4 w-4" /> <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <p className="truncate text-xs text-muted-foreground" title={email}>{email}</p>
         <button onClick={onSignOut} className="mt-2 inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm text-foreground hover:bg-muted">
           <LogOut className="h-4 w-4" /> Sign out
@@ -571,6 +579,7 @@ function AppPage() {
             {view === "posts" && <PostsView prefill={prefill} />}
             {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
             {view === "discover" && <DiscoverView />}
+            {view === "settings" && <SettingsView email={email} onSignOut={signOut} />}
           </main>
         </div>
       </div>
