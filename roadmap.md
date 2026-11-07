@@ -1,4 +1,7 @@
 # Media attachments
+# Sign-in rate-limit wait
+- [x] Verify documented seconds conversion, wait thresholds and countdown lockout without changing Buffer routes.
+
 - [x] Record saved media references and protect in-flight saves from cleanup.
 - [x] Add authenticated hourly cleanup for unlinked uploads older than 24 hours.
 - [x] Test cleanup age/reference rules, authenticated callback and scheduling configuration.

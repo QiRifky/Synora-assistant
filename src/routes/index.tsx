@@ -1,4 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
+import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
 
 const MESSAGES: Record<string, string> = {
   access_denied: "Looks like the Buffer sign-in was cancelled.",
@@ -7,8 +10,6 @@ const MESSAGES: Record<string, string> = {
   rate_limited: "Buffer is receiving too many requests right now. Please wait a few minutes and try again.",
   account_lookup: "We signed you in with Buffer but couldn't read your Buffer account. Please try again in a moment.",
 };
-
-const SIGN_IN_HREF = "/api/public/buffer/start";
 
 const SIGN_IN_CLASS =
   "inline-flex h-12 items-center rounded-full bg-primary px-8 text-base font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5";
@@ -46,7 +47,8 @@ const REASONS = [
 export const Route = createFileRoute("/")({
   validateSearch: (s: Record<string, unknown>): { error?: string | undefined; retry?: number | undefined } => ({
     error: typeof s["error"] === "string" ? s["error"] : undefined,
-    retry: Number.isInteger(Number(s["retry"])) && Number(s["retry"]) > 0 && Number(s["retry"]) < 1440 ? Number(s["retry"]) : undefined,
+    // The callback already converts Buffer seconds to minutes; don't divide twice.
+    retry: Number.isFinite(Number(s["retry"])) && Number(s["retry"]) > 0 ? Number(s["retry"]) : undefined,
   }),
   head: () => ({
     meta: [
@@ -63,6 +65,8 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { error, retry } = Route.useSearch();
+  const { remaining, startSignIn } = useSignInCooldown(error === "rate_limited", retry);
+  const waiting = remaining > 0;
 
   return (
     <main className="bg-background text-foreground">
@@ -84,18 +88,19 @@ function Index() {
             >
               <p>
                 {error === "rate_limited" && retry
-                  ? `Buffer is receiving too many requests right now. Try again in about ${retry} minute${retry === 1 ? "" : "s"}.`
+                  ? `Buffer is receiving too many requests right now. ${rateLimitWaitMessage(retry)}.`
                   : MESSAGES[error] ?? "Something went wrong while signing you in."}
               </p>
-              <a href={SIGN_IN_HREF} className="mt-2 inline-block font-medium text-primary underline underline-offset-4">
+              {waiting && <p className="mt-2 text-xs text-muted-foreground" role="timer">Sign-in available in {waitCountdown(remaining)}</p>}
+              <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium underline underline-offset-4">
                 Try again
-              </a>
+              </Button>
             </div>
           )}
 
-          <a href={SIGN_IN_HREF} className={`${SIGN_IN_CLASS} mt-10`}>
+          <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-10`}>
             Sign in with Buffer
-          </a>
+          </Button>
           <p className="mt-4 text-sm text-muted-foreground">
             Synora saves drafts. It never publishes on its own.
           </p>
@@ -136,9 +141,9 @@ function Index() {
           <p className="mt-3 text-base text-muted-foreground">
             Sign in with Buffer and Synora shows your channels, then waits for your link.
           </p>
-          <a href={SIGN_IN_HREF} className={`${SIGN_IN_CLASS} mt-8`}>
+          <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-8`}>
             Sign in with Buffer
-          </a>
+          </Button>
         </section>
       </div>
 
