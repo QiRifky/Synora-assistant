@@ -4,12 +4,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { charLimit } from "@/lib/trends.functions";
 import { mediaInput, ownsMedia, postAssets, MAX_MEDIA_BYTES, MEDIA_BUCKET, type MediaAttachment } from "@/lib/media";
 import { checkMediaAgainstLimits, effectiveMediaLimits, formatBytes, type EffectiveMediaLimits } from "@/lib/media-limits";
+import { retryAfterMinutes } from "@/lib/rate-limit";
+
+/** Set when Buffer rate-limited us; minutes until retry when Buffer said so. */
+export type Busy = { retryAfterMin: number | null };
+type Err = { status: "error"; message?: string; busy?: Busy };
+type Stale = { stale?: Busy };
 
 export type BufferChannel = { id: string; name: string; service: string; avatar: string | null };
 export type ChannelsResult =
-  | { status: "ok"; channels: BufferChannel[] }
+  | ({ status: "ok"; channels: BufferChannel[] } & Stale)
   | { status: "reconnect" }
-  | { status: "error" };
+  | Err;
 
 export type PostStatus = "draft" | "scheduled" | "sent";
 export type BufferPost = {
@@ -17,29 +23,53 @@ export type BufferPost = {
   dueAt: string | null; sentAt: string | null; createdAt: string | null;
 };
 export type PostsResult =
-  | { status: "ok"; posts: BufferPost[]; hasMore: boolean }
+  | ({ status: "ok"; posts: BufferPost[]; hasMore: boolean } & Stale)
   | { status: "reconnect" }
-  | { status: "error" };
+  | Err;
 export type SummaryResult =
-  | { status: "ok"; channels: number; counts: Record<PostStatus, { count: number; hasMore: boolean }> }
+  | ({ status: "ok"; channels: number; counts: Record<PostStatus, { count: number; hasMore: boolean }> } & Stale)
   | { status: "reconnect" }
-  | { status: "error" };
+  | Err;
 
 const PAGE = 50;
 const TTL = 60_000;
-// Best-effort per-worker cache to stay under Buffer's rate limits. Holds no tokens.
+const STATUSES = ["draft", "scheduled", "sent"] as const;
+// Best-effort per-worker caches to stay under Buffer's rate limits. They hold no tokens.
 const cache = new Map<string, { at: number; value: unknown }>();
+const lastGood = new Map<string, unknown>();
+const inflight = new Map<string, Promise<unknown>>();
+
+/**
+ * Serves fresh cache (60s), deduplicates concurrent identical loads, and on a
+ * Buffer 429 falls back to the last good result marked `stale` instead of an error.
+ */
 async function cached<T extends { status: string }>(key: string, force: boolean, run: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
   if (!force && hit && Date.now() - hit.at < TTL) return hit.value as T;
-  const value = await run();
-  if (value.status === "ok") cache.set(key, { at: Date.now(), value });
-  else cache.delete(key);
-  return value;
+  const pending = inflight.get(key);
+  if (pending) return pending as Promise<T>;
+  const p = (async () => {
+    const value = await run();
+    if (value.status === "ok") {
+      cache.set(key, { at: Date.now(), value });
+      lastGood.set(key, value);
+      return value;
+    }
+    const busy = (value as Err).busy;
+    const prev = lastGood.get(key);
+    if (busy && prev) return { ...(prev as object), stale: busy } as unknown as T;
+    cache.delete(key);
+    return value;
+  })().finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
 }
 
 class Reconnect extends Error {}
 class Failed extends Error {}
+class RateLimited extends Error {
+  constructor(public retryAfterMin: number | null) { super("rate_limited"); }
+}
 
 async function gql(token: string, query: string, variables?: Record<string, unknown>) {
   const res = await fetch("https://api.buffer.com", {
@@ -48,8 +78,13 @@ async function gql(token: string, query: string, variables?: Record<string, unkn
     body: JSON.stringify({ query, variables }),
   });
   const body = (await res.json().catch(() => null)) as
-    | { data?: any; errors?: { message?: string; extensions?: { code?: string } }[] }
+    | { data?: any; errors?: { message?: string; extensions?: { code?: string; retryAfter?: unknown } }[] }
     | null;
+  const limited = res.status === 429 || !!body?.errors?.some((e) => /RATE_LIMIT/i.test(e.extensions?.code ?? ""));
+  if (limited) {
+    console.error("buffer api rate limited", res.status);
+    throw new RateLimited(retryAfterMinutes(res.headers, body?.errors?.[0]?.extensions?.retryAfter));
+  }
   const unauth =
     res.status === 401 || res.status === 403 ||
     !!body?.errors?.some((e) => /UNAUTH|FORBIDDEN/i.test(e.extensions?.code ?? "") || /unauth|expired|invalid token/i.test(e.message ?? ""));
@@ -71,60 +106,110 @@ async function getToken(userId: string) {
   return conn.access_token as string;
 }
 
-async function guard<T>(run: () => Promise<T>): Promise<T | { status: "reconnect" } | { status: "error" }> {
+const BUSY_MESSAGE = "Buffer is receiving too many requests right now. Please wait a few minutes and try again.";
+
+async function guard<T>(run: () => Promise<T>): Promise<T | { status: "reconnect" } | Err> {
   try { return await run(); }
   catch (e) {
     if (e instanceof Reconnect) return { status: "reconnect" };
+    if (e instanceof RateLimited) return { status: "error", message: BUSY_MESSAGE, busy: { retryAfterMin: e.retryAfterMin } };
     if (!(e instanceof Failed)) console.error("buffer request error");
     return { status: "error" };
   }
 }
 
-async function orgIds(token: string): Promise<string[]> {
-  const d = await gql(token, "query { account { organizations { id } } }");
-  return (d?.account?.organizations ?? []).map((o: { id: string }) => String(o.id));
+// ---------- Account (organizations + channel limits) in a single request ----------
+
+type Org = { id: string; used: number | null; limit: number | null };
+type OrgsResult = ({ status: "ok"; orgs: Org[] } & Stale) | { status: "reconnect" } | Err;
+
+function loadOrgs(userId: string, force: boolean): Promise<OrgsResult> {
+  return cached(`${userId}:account`, force, () => guard(async () => {
+    const token = await getToken(userId);
+    const d = await gql(token, "query { account { organizations { id channelCount limits { channels } } } }");
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    const orgs: Org[] = (d?.account?.organizations ?? []).map((o: { id: string; channelCount?: number; limits?: { channels?: number } }) => ({
+      id: String(o.id), used: num(o.channelCount), limit: num(o.limits?.channels),
+    }));
+    return { status: "ok" as const, orgs };
+  }) as Promise<OrgsResult>);
 }
 
-async function loadChannels(userId: string, force: boolean): Promise<ChannelsResult> {
+async function orgIdsFor(userId: string): Promise<string[]> {
+  const r = await loadOrgs(userId, false);
+  if (r.status === "reconnect") throw new Reconnect();
+  if (r.status !== "ok") { if (r.busy) throw new RateLimited(r.busy.retryAfterMin); throw new Failed(); }
+  return r.orgs.map((o) => o.id);
+}
+
+/** Builds one aliased GraphQL request covering every organization. */
+function aliased(orgs: string[], field: (alias: string, v: string) => string) {
+  const decl = orgs.map((_, i) => `$o${i}: OrganizationId!`).join(", ");
+  const body = orgs.map((_, i) => field(`o${i}`, `$o${i}`)).join("\n");
+  const vars = Object.fromEntries(orgs.map((o, i) => [`o${i}`, o]));
+  return { query: `query(${decl}) { ${body} }`, vars };
+}
+
+function loadChannels(userId: string, force: boolean): Promise<ChannelsResult> {
   return cached(`${userId}:channels`, force, () => guard(async () => {
-    const token = await getToken(userId);
+    const orgs = await orgIdsFor(userId);
     const channels: BufferChannel[] = [];
-    for (const org of await orgIds(token)) {
-      const d = await gql(token, "query($o: OrganizationId!) { channels(input: { organizationId: $o }) { id name displayName service avatar } }", { o: org });
-      for (const c of d?.channels ?? []) {
-        channels.push({ id: String(c.id), name: c.displayName || c.name || "Unnamed", service: String(c.service ?? ""), avatar: c.avatar || null });
-      }
+    if (orgs.length) {
+      const token = await getToken(userId);
+      const { query, vars } = aliased(orgs, (a, v) => `${a}: channels(input: { organizationId: ${v} }) { id name displayName service avatar }`);
+      const d = await gql(token, query, vars);
+      orgs.forEach((_, i) => {
+        for (const c of d?.[`o${i}`] ?? []) {
+          channels.push({ id: String(c.id), name: c.displayName || c.name || "Unnamed", service: String(c.service ?? ""), avatar: c.avatar || null });
+        }
+      });
     }
     return { status: "ok" as const, channels };
-  }));
+  }) as Promise<ChannelsResult>);
+}
+
+type AllPosts = ({ status: "ok"; byStatus: Record<PostStatus, { posts: BufferPost[]; hasMore: boolean }> } & Stale) | { status: "reconnect" } | Err;
+
+/** Drafts, scheduled and sent posts for every organization in one request. */
+function loadAllPosts(userId: string, force: boolean): Promise<AllPosts> {
+  return cached(`${userId}:posts`, force, () => guard(async () => {
+    const ch = await loadChannels(userId, false);
+    const names = new Map(ch.status === "ok" ? ch.channels.map((c) => [c.id, c.name]) : []);
+    const orgs = await orgIdsFor(userId);
+    const byStatus = Object.fromEntries(STATUSES.map((s) => [s, { posts: [] as BufferPost[], hasMore: false }])) as Record<PostStatus, { posts: BufferPost[]; hasMore: boolean }>;
+    if (orgs.length) {
+      const token = await getToken(userId);
+      const parts: string[] = [];
+      const vars: Record<string, unknown> = { first: PAGE };
+      const decl: string[] = ["$first: Int"];
+      orgs.forEach((org, i) => STATUSES.forEach((s) => {
+        const sort = s === "scheduled" ? [{ field: "dueAt", direction: "asc" }] : [{ field: s === "sent" ? "dueAt" : "createdAt", direction: "desc" }];
+        const k = `${s}${i}`;
+        decl.push(`$${k}: PostsInput!`);
+        vars[k] = { organizationId: org, filter: { status: [s] }, sort };
+        parts.push(`${k}: posts(input: $${k}, first: $first) { edges { node { id text channelId channelService dueAt sentAt createdAt } } pageInfo { hasNextPage } }`);
+      }));
+      const d = await gql(token, `query(${decl.join(", ")}) { ${parts.join("\n")} }`, vars);
+      orgs.forEach((_, i) => STATUSES.forEach((s) => {
+        const conn = d?.[`${s}${i}`];
+        byStatus[s].hasMore ||= !!conn?.pageInfo?.hasNextPage;
+        for (const e of conn?.edges ?? []) {
+          const n = e.node;
+          byStatus[s].posts.push({
+            id: String(n.id), text: n.text ?? "", channelName: names.get(String(n.channelId)) ?? "Unknown channel",
+            service: String(n.channelService ?? ""), dueAt: n.dueAt ?? null, sentAt: n.sentAt ?? null, createdAt: n.createdAt ?? null,
+          });
+        }
+      }));
+    }
+    return { status: "ok" as const, byStatus };
+  }) as Promise<AllPosts>);
 }
 
 async function loadPosts(userId: string, status: PostStatus, force: boolean): Promise<PostsResult> {
-  return cached(`${userId}:posts:${status}`, force, () => guard(async () => {
-    const ch = await loadChannels(userId, false);
-    const names = new Map(ch.status === "ok" ? ch.channels.map((c) => [c.id, c.name]) : []);
-    const token = await getToken(userId);
-    const sort = status === "scheduled"
-      ? [{ field: "dueAt", direction: "asc" }]
-      : [{ field: status === "sent" ? "dueAt" : "createdAt", direction: "desc" }];
-    const posts: BufferPost[] = [];
-    let hasMore = false;
-    for (const org of await orgIds(token)) {
-      const d = await gql(token,
-        `query($input: PostsInput!, $first: Int) { posts(input: $input, first: $first) {
-          edges { node { id text channelId channelService dueAt sentAt createdAt } } pageInfo { hasNextPage } } }`,
-        { first: PAGE, input: { organizationId: org, filter: { status: [status] }, sort } });
-      hasMore ||= !!d?.posts?.pageInfo?.hasNextPage;
-      for (const e of d?.posts?.edges ?? []) {
-        const n = e.node;
-        posts.push({
-          id: String(n.id), text: n.text ?? "", channelName: names.get(String(n.channelId)) ?? "Unknown channel",
-          service: String(n.channelService ?? ""), dueAt: n.dueAt ?? null, sentAt: n.sentAt ?? null, createdAt: n.createdAt ?? null,
-        });
-      }
-    }
-    return { status: "ok" as const, posts, hasMore };
-  }));
+  const r = await loadAllPosts(userId, force);
+  if (r.status !== "ok") return r;
+  return { status: "ok", ...r.byStatus[status], ...(r.stale ? { stale: r.stale } : {}) };
 }
 
 const forceInput = (d: unknown) => z.object({ force: z.boolean().optional() }).optional().parse(d);
@@ -145,15 +230,14 @@ export const getBufferSummary = createServerFn({ method: "POST" })
   .inputValidator(forceInput)
   .handler(async ({ data, context }): Promise<SummaryResult> => {
     const force = !!data?.force;
+    if (force) await loadOrgs(context.userId, true);
     const ch = await loadChannels(context.userId, force);
     if (ch.status !== "ok") return ch;
-    const counts = {} as Record<PostStatus, { count: number; hasMore: boolean }>;
-    for (const s of ["draft", "scheduled", "sent"] as const) {
-      const r = await loadPosts(context.userId, s, force);
-      if (r.status !== "ok") return r;
-      counts[s] = { count: r.posts.length, hasMore: r.hasMore };
-    }
-    return { status: "ok", channels: ch.channels.length, counts };
+    const all = await loadAllPosts(context.userId, force);
+    if (all.status !== "ok") return all;
+    const counts = Object.fromEntries(STATUSES.map((s) => [s, { count: all.byStatus[s].posts.length, hasMore: all.byStatus[s].hasMore }])) as Record<PostStatus, { count: number; hasMore: boolean }>;
+    const stale = ch.stale ?? all.stale;
+    return { status: "ok", channels: ch.channels.length, counts, ...(stale ? { stale } : {}) };
   });
 
 // ---------- Writes (never publish automatically; scheduling only on explicit user action) ----------
@@ -166,7 +250,7 @@ export type ChannelOutcome = { channelId: string; ok: boolean; message: string }
 export type WriteResult =
   | { status: "ok"; results: ChannelOutcome[] }
   | { status: "reconnect" }
-  | { status: "error"; message?: string };
+  | Err;
 
 const POST_RESULT = `__typename ... on PostActionSuccess { post { id } } ... on MutationError { message }`;
 
@@ -304,15 +388,16 @@ export const deleteBufferDraft = createServerFn({ method: "POST" })
   });
 
 export type BufferIdea = { id: string; title: string; text: string; createdAt: number | null };
-export type IdeasResult = { status: "ok"; ideas: BufferIdea[] } | { status: "reconnect" } | { status: "error" };
+export type IdeasResult = ({ status: "ok"; ideas: BufferIdea[] } & Stale) | { status: "reconnect" } | Err;
 
 export const getBufferIdeas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(forceInput)
   .handler(({ data, context }) => cached(`${context.userId}:ideas`, !!data?.force, () => guard(async () => {
+    const orgs = await orgIdsFor(context.userId);
     const token = await getToken(context.userId);
     const ideas: BufferIdea[] = [];
-    for (const org of await orgIds(token)) {
+    for (const org of orgs) {
       const d = await gql(token, `query($input: IdeasInput!, $first: Int) { ideas(input: $input, first: $first) {
         edges { node { id createdAt content { title text } } } } }`, { first: 50, input: { organizationId: org } });
       for (const e of d?.ideas?.edges ?? []) {
@@ -332,8 +417,8 @@ export const createBufferIdea = createServerFn({ method: "POST" })
       let media;
       try { media = await resolveMedia(context.userId, data.media, true); }
       catch (e) { return { status: "error" as const, message: e instanceof Error ? e.message : "Couldn't validate the attachments." }; }
+      const [org] = await orgIdsFor(context.userId);
       const token = await getToken(context.userId);
-      const [org] = await orgIds(token);
       if (!org) return { status: "error" as const, message: "No Buffer organization found." };
       const tracking = await import("@/lib/media-tracking.server");
       const operation = await tracking.protectMedia(context.userId, data.media);
@@ -356,19 +441,17 @@ export const createBufferIdea = createServerFn({ method: "POST" })
   });
 
 export type ChannelLimitResult =
-  | { status: "ok"; orgs: { used: number; limit: number }[] }
+  | ({ status: "ok"; orgs: { used: number; limit: number }[] } & Stale)
   | { status: "reconnect" }
-  | { status: "error" };
+  | Err;
 
-// Organization.channelCount and Organization.limits.channels from the official reference.
+// Organization.channelCount and Organization.limits.channels, shared with the account request.
 export const getBufferChannelLimit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(forceInput)
-  .handler(({ data, context }) => cached(`${context.userId}:channel-limit`, !!data?.force, () => guard(async () => {
-    const token = await getToken(context.userId);
-    const d = await gql(token, "query { account { organizations { channelCount limits { channels } } } }");
-    const orgs = (d?.account?.organizations ?? [])
-      .map((o: { channelCount?: number; limits?: { channels?: number } }) => ({ used: Number(o.channelCount), limit: Number(o.limits?.channels) }))
-      .filter((o: { used: number; limit: number }) => Number.isFinite(o.used) && Number.isFinite(o.limit));
-    return { status: "ok" as const, orgs };
-  }) as Promise<ChannelLimitResult>));
+  .handler(async ({ data, context }): Promise<ChannelLimitResult> => {
+    const r = await loadOrgs(context.userId, !!data?.force);
+    if (r.status !== "ok") return r;
+    const orgs = r.orgs.flatMap((o) => (o.used !== null && o.limit !== null ? [{ used: o.used, limit: o.limit }] : []));
+    return { status: "ok", orgs, ...(r.stale ? { stale: r.stale } : {}) };
+  });

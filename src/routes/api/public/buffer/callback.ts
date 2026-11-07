@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { callbackUrl } from "@/lib/pkce.server";
+import { retryAfterMinutes } from "@/lib/rate-limit";
 
 // Never log tokens. Errors are reported by short codes only.
 export const Route = createFileRoute("/api/public/buffer/callback")({
@@ -48,12 +49,24 @@ export const Route = createFileRoute("/api/public/buffer/callback")({
         };
         if (!tok.access_token) return fail("token_exchange");
 
-        // 3. Fetch the Buffer account.
-        const apiRes = await fetch("https://api.buffer.com", {
+        // 3. Fetch the Buffer account (one retry after 2s if Buffer rate-limits us).
+        const lookup = () => fetch("https://api.buffer.com", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok.access_token}` },
           body: JSON.stringify({ query: "query { account { id email } }" }),
         });
+        let apiRes = await lookup();
+        if (apiRes.status === 429) {
+          await new Promise((r) => setTimeout(r, 2000));
+          apiRes = await lookup();
+        }
+        if (apiRes.status === 429) {
+          console.error("buffer account lookup rate limited", apiRes.status);
+          const mins = retryAfterMinutes(apiRes.headers);
+          const to = new URL("/?error=rate_limited", url);
+          if (mins) to.searchParams.set("retry", String(mins));
+          return Response.redirect(to, 302);
+        }
         const api = apiRes.ok
           ? ((await apiRes.json()) as { data?: { account?: { id?: string; email?: string | null } } })
           : null;

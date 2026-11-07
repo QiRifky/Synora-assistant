@@ -4,6 +4,8 @@ const MESSAGES: Record<string, string> = {
   access_denied: "Looks like the Buffer sign-in was cancelled.",
   invalid_state: "That sign-in link expired. Please start again.",
   not_configured: "Sign-in isn't set up yet. Please try again shortly.",
+  rate_limited: "Buffer is receiving too many requests right now. Please wait a few minutes and try again.",
+  account_lookup: "We signed you in with Buffer but couldn't read your Buffer account. Please try again in a moment.",
 };
 
 const SIGN_IN_HREF = "/api/public/buffer/start";
@@ -42,8 +44,9 @@ const REASONS = [
 ];
 
 export const Route = createFileRoute("/")({
-  validateSearch: (s: Record<string, unknown>): { error?: string | undefined } => ({
+  validateSearch: (s: Record<string, unknown>): { error?: string | undefined; retry?: number | undefined } => ({
     error: typeof s["error"] === "string" ? s["error"] : undefined,
+    retry: Number.isInteger(Number(s["retry"])) && Number(s["retry"]) > 0 && Number(s["retry"]) < 1440 ? Number(s["retry"]) : undefined,
   }),
   head: () => ({
     meta: [
@@ -59,7 +62,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { error } = Route.useSearch();
+  const { error, retry } = Route.useSearch();
 
   return (
     <main className="bg-background text-foreground">
@@ -79,7 +82,11 @@ function Index() {
               role="alert"
               className="mt-8 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm text-foreground"
             >
-              <p>{MESSAGES[error] ?? "Something went wrong while signing you in."}</p>
+              <p>
+                {error === "rate_limited" && retry
+                  ? `Buffer is receiving too many requests right now. Try again in about ${retry} minute${retry === 1 ? "" : "s"}.`
+                  : MESSAGES[error] ?? "Something went wrong while signing you in."}
+              </p>
               <a href={SIGN_IN_HREF} className="mt-2 inline-block font-medium text-primary underline underline-offset-4">
                 Try again
               </a>

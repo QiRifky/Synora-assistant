@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSummary, type PostStatus } from "@/lib/buffer.functions";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -279,8 +279,11 @@ function PageHeader({ title, onRefresh, busy }: { title: string; onRefresh?: () 
   );
 }
 
-function Problem({ status }: { status: "reconnect" | "error" }) {
-  if (status === "reconnect") {
+type Busy = { retryAfterMin: number | null };
+const waitText = (b?: Busy | null) => b?.retryAfterMin ? ` Try again in about ${b.retryAfterMin} minute${b.retryAfterMin === 1 ? "" : "s"}.` : " Please wait a few minutes and try again.";
+
+function Problem({ res }: { res: { status: string; busy?: Busy } }) {
+  if (res.status === "reconnect") {
     return (
       <div className="mt-6 rounded-2xl border border-border bg-card p-6">
         <p className="text-sm text-muted-foreground">Your Buffer connection has expired or was revoked.</p>
@@ -288,7 +291,14 @@ function Problem({ status }: { status: "reconnect" | "error" }) {
       </div>
     );
   }
+  if (res.busy) return <p role="alert" className="mt-6 text-sm text-destructive">Buffer is receiving too many requests right now.{waitText(res.busy)}</p>;
   return <p role="alert" className="mt-6 text-sm text-destructive">Couldn't reach Buffer right now. Please try Refresh in a moment.</p>;
+}
+
+/** Shown when Buffer rate-limited us and we're displaying the last saved data. */
+function StaleBanner({ res }: { res: { status: string; stale?: Busy } | null }) {
+  if (res?.status !== "ok" || !res.stale) return null;
+  return <p role="status" className="mt-4 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Buffer is busy, showing saved data.{waitText(res.stale)}</p>;
 }
 
 function Skeletons({ n = 3 }: { n?: number }) {
@@ -299,16 +309,36 @@ function Skeletons({ n = 3 }: { n?: number }) {
   );
 }
 
+const MANUAL_GAP = 30_000;
+
+/** Loads once the tab is visible; manual refresh bypasses the cache at most every 30s. */
 function useLoad<T>(load: (force: boolean) => Promise<T>, deps: unknown[] = []) {
   const [res, setRes] = useState<T | { status: "error" } | null>(null);
   const [busy, setBusy] = useState(false);
-  const run = (force: boolean) => {
+  const busyRef = useRef(false);
+  const lastForced = useRef(0);
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const run = useCallback((force: boolean) => {
+    if (busyRef.current || document.hidden) return;
+    if (force) {
+      if (Date.now() - lastForced.current < MANUAL_GAP) return;
+      lastForced.current = Date.now();
+    }
+    busyRef.current = true;
     setBusy(true);
     if (!force) setRes(null);
-    load(force).then(setRes).catch(() => setRes({ status: "error" })).finally(() => setBusy(false));
-  };
-  useEffect(() => { run(false); }, deps); // eslint-disable-line react-hooks/exhaustive-deps
-  return { res, busy, refresh: () => run(true) };
+    loadRef.current(force).then(setRes).catch(() => setRes({ status: "error" }))
+      .finally(() => { busyRef.current = false; setBusy(false); });
+  }, []);
+  useEffect(() => {
+    if (!document.hidden) { run(false); return; }
+    const onVisible = () => { if (!document.hidden) { document.removeEventListener("visibilitychange", onVisible); run(false); } };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+  const refresh = useCallback(() => run(true), [run]);
+  return { res, busy, refresh };
 }
 
 function OverviewView() {
@@ -319,7 +349,8 @@ function OverviewView() {
     <>
       <PageHeader title="Overview" onRefresh={refresh} busy={busy} />
       {!res && <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-muted" />)}</div>}
-      {res && res.status !== "ok" && <Problem status={res.status} />}
+      {res && res.status !== "ok" && <Problem res={res} />}
+      <StaleBanner res={res} />
       {res?.status === "ok" && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -344,18 +375,22 @@ function ChannelsView() {
   const fn = useServerFn(getBufferChannels);
   const limitFn = useServerFn(getBufferChannelLimit);
   const [limit, setLimit] = useState<Awaited<ReturnType<typeof getBufferChannelLimit>> | null>(null);
-  const last = useRef(Date.now());
+  const lastAuto = useRef(Date.now());
   const { res, busy, refresh } = useLoad((force) => {
-    last.current = Date.now();
     limitFn({ data: { force } }).then(setLimit).catch(() => setLimit({ status: "error" }));
     return fn({ data: { force } });
   });
-  // Reload when the user returns from Buffer, at most once every 30 seconds.
+  // Reload when the user returns to this tab, at most once every 2 minutes.
   useEffect(() => {
-    const onFocus = () => { if (Date.now() - last.current >= 30_000) refresh(); };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  });
+    const onReturn = () => {
+      if (document.hidden || Date.now() - lastAuto.current < 120_000) return;
+      lastAuto.current = Date.now();
+      refresh();
+    };
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => { window.removeEventListener("focus", onReturn); document.removeEventListener("visibilitychange", onReturn); };
+  }, [refresh]);
   const atLimit = limit?.status === "ok" && limit.orgs.some((o) => o.limit > 0 && o.used >= o.limit);
   const known = limit?.status === "ok" && limit.orgs.length > 0;
   return (
@@ -376,7 +411,8 @@ function ChannelsView() {
       {!atLimit && limit && limit.status !== "reconnect" && !known && <p className="mt-3 text-xs text-muted-foreground">Your Buffer plan may limit how many channels you can connect. Buffer will tell you if you reach it.</p>}
       {limit?.status === "ok" && known && !atLimit && <p className="mt-3 text-xs text-muted-foreground">Channels used: {limit.orgs.map((o) => `${o.used} of ${o.limit}`).join(", ")} allowed by your Buffer plan.</p>}
       {!res && <Skeletons />}
-      {res && res.status !== "ok" && <Problem status={res.status} />}
+      {res && res.status !== "ok" && <Problem res={res} />}
+      <StaleBanner res={res} />
       {res?.status === "ok" && res.channels.length === 0 && (
         <p className="mt-6 text-sm text-muted-foreground">No channels connected in Buffer yet. Connect one in Buffer, then press Refresh channels.</p>
       )}
@@ -409,7 +445,8 @@ function PostList({ status, version }: { status: PostStatus; version: number }) 
         </button>
       </div>
       {!res && <Skeletons />}
-      {res && res.status !== "ok" && <Problem status={res.status} />}
+      {res && res.status !== "ok" && <Problem res={res} />}
+      <StaleBanner res={res} />
       {res?.status === "ok" && res.posts.length === 0 && <p className="mt-6 text-sm text-muted-foreground">No {label} in Buffer yet.</p>}
       {res?.status === "ok" && res.posts.length > 0 && (
         <ul className="mt-4 space-y-3">
@@ -465,7 +502,8 @@ function DiscoverView() {
     <>
       <PageHeader title="Discover" />
       {!res && <Skeletons n={1} />}
-      {res && res.status !== "ok" && <Problem status={res.status} />}
+      {res && res.status !== "ok" && <Problem res={res} />}
+      <StaleBanner res={res} />
       {res?.status === "ok" && res.channels.length === 0 && <p className="mt-6 text-sm text-muted-foreground">Connect a channel in Buffer to write posts for it.</p>}
       {res?.status === "ok" && res.channels.length > 0 && <Composer channels={res.channels} channelId={channelId} setChannelId={setChannelId} />}
       <Trends channel={selected} />
