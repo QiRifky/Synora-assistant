@@ -174,7 +174,7 @@ function TopicTools({ niche, topic, channel }: { niche: string; topic: Topic; ch
           </button>
         </div>
       )}
-      {saved && <p className="mt-2 text-sm text-foreground">{saved}</p>}
+      {saved && <p className="mt-2 text-sm text-success">{saved}</p>}
       {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
       {reconnect && <ReconnectButton />}
     </div>
@@ -231,7 +231,7 @@ function Composer({ channels, channelId, setChannelId }: { channels: Channel[]; 
           </button>
         </div>
       )}
-      {saved && <p className="mt-3 text-sm text-foreground">Saved as a draft in Buffer{channel ? ` for ${channel.name}` : ""}.</p>}
+      {saved && <p className="mt-3 text-sm text-success">Saved as a draft in Buffer{channel ? ` for ${channel.name}` : ""}.</p>}
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       {reconnect && <ReconnectButton />}
     </section>
