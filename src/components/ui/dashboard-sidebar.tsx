@@ -64,7 +64,7 @@ export function SidebarNav<T extends string>({
     <Sidebar className="border-r border-border [&>[data-sidebar=sidebar]]:bg-card [&>[data-sidebar=sidebar]]:text-card-foreground motion-reduce:transition-none">
       <SidebarHeader className="bg-card px-5 pb-3 pt-6">
         <div className="flex min-h-6 items-center justify-between gap-3">
-          <SynoraLogo className="self-start" />
+          <SynoraLogo className="self-start opacity-70" />
           <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden" aria-label="Close navigation" onClick={() => setOpenMobile(false)}>
             <X className="h-4 w-4" />
           </Button>
