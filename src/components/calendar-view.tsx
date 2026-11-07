@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Columns3, Grid2X2, Plus, RefreshCw } from "lucide-react";
 import { getBufferChannels, getBufferPosts, type BufferChannel, type BufferPost, type PostsResult } from "@/lib/buffer.functions";
 import { loadPreferences } from "@/lib/preferences-client";
 import { addDays, browserTimeZone, dayKeyInZone, defaultSlot, isValidTimeZone } from "@/lib/timezone";
@@ -29,12 +29,25 @@ function Chip({ p, onOpen }: { p: CalPost; onOpen: (p: CalPost) => void }) {
   );
 }
 
+function PostCard({ p, tz, onOpen }: { p: CalPost; tz: string; onOpen: (p: CalPost) => void }) {
+  return (
+    <button type="button" onClick={() => onOpen(p)} className="block w-full min-w-0 rounded-md border border-border bg-card p-3 text-left hover:bg-muted/50">
+      <p className="line-clamp-2 break-words text-sm font-medium text-foreground">{p.text || "(no text)"}</p>
+      <p className="my-2 break-words text-xs text-muted-foreground">{p.channelName} · {new Date(p.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: tz })}</p>
+      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ${p.status === "scheduled" ? "bg-primary/15 text-foreground" : "bg-muted text-muted-foreground"}`}>{p.status === "scheduled" ? "Scheduled" : "Sent"}</span>
+    </button>
+  );
+}
+
 export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string) => void; Reconnect: () => React.ReactNode }) {
   const postsFn = useServerFn(getBufferPosts);
   const channelsFn = useServerFn(getBufferChannels);
   const [tz, setTz] = useState("UTC");
   const [now, setNow] = useState<Date | null>(null);
-  const [mode, setMode] = useState<"month" | "week">("month");
+  const [mode, setMode] = useState<"month" | "week" | "list">("month");
+  const [status, setStatus] = useState<"all" | "scheduled" | "sent">("all");
+  const [agenda, setAgenda] = useState(true);
+  const [picked, setPicked] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<string | null>(null);
   const [channel, setChannel] = useState("all");
   const [channels, setChannels] = useState<BufferChannel[]>([]);
@@ -82,23 +95,23 @@ export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string)
     const all: CalPost[] = [
       ...ok.scheduled.posts.filter((p) => p.dueAt).map((p) => ({ ...p, status: "scheduled" as const, at: p.dueAt! })),
       ...ok.sent.posts.filter((p) => p.sentAt ?? p.dueAt).map((p) => ({ ...p, status: "sent" as const, at: (p.sentAt ?? p.dueAt)! })),
-    ].filter((p) => channel === "all" || p.channelId === channel);
+    ].filter((p) => (channel === "all" || p.channelId === channel) && (status === "all" || p.status === status));
     all.sort((a, b) => a.at.localeCompare(b.at));
     for (const p of all) {
       const k = dayKeyInZone(new Date(p.at), tz);
       map.set(k, [...(map.get(k) ?? []), p]);
     }
     return map;
-  }, [ok, channel, tz]);
+  }, [ok, channel, status, tz]);
 
   if (!anchor || !now) return <div className="h-64 animate-pulse rounded-2xl bg-muted" />;
   const today = dayKeyInZone(now, tz);
   const monthStart = `${anchor.slice(0, 7)}-01`;
-  const start = mode === "month" ? addDays(monthStart, -weekday(monthStart)) : addDays(anchor, -weekday(anchor));
+  const start = mode !== "week" ? addDays(monthStart, -weekday(monthStart)) : addDays(anchor, -weekday(anchor));
   const days: string[] = [];
   if (mode === "week") for (let i = 0; i < 7; i++) days.push(addDays(start, i));
   else for (let k = start; days.length < 42 && (days.length % 7 !== 0 || k.slice(0, 7) <= anchor.slice(0, 7)); k = addDays(k, 1)) days.push(k);
-  const inRange = (k: string) => (mode === "month" ? k.slice(0, 7) === anchor.slice(0, 7) : days.includes(k));
+  const inRange = (k: string) => (mode !== "week" ? k.slice(0, 7) === anchor.slice(0, 7) : days.includes(k));
   const rangeHasPosts = days.some((k) => inRange(k) && byDay.has(k));
 
   function step(dir: 1 | -1) {
@@ -107,33 +120,42 @@ export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string)
     setAnchor(new Date(Date.UTC(y!, m! - 1 + dir, 1)).toISOString().slice(0, 10));
   }
   const create = (k: string) => { if (k >= today) onCreate(defaultSlot(k, today, new Date(), tz)); };
-  const title = mode === "month" ? keyLabel(monthStart, { month: "long", year: "numeric" })
+  const title = mode !== "week" ? keyLabel(monthStart, { month: "long", year: "numeric" })
     : `${keyLabel(days[0]!, { month: "short", day: "numeric" })} – ${keyLabel(days[6]!, { month: "short", day: "numeric", year: "numeric" })}`;
   const btn = "inline-flex h-9 items-center gap-1 rounded-full border border-border px-3 text-sm text-foreground hover:bg-muted disabled:opacity-50";
   const fmtTime = (p: CalPost) => new Date(p.at).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short", timeZone: tz });
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl text-foreground">Calendar</h1>
-        <button onClick={() => run(true)} disabled={busy} className={btn}><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> Refresh</button>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl text-foreground">Calendar</h1>
+          <p className="mt-2 text-xs text-muted-foreground">{tz} · <span className="inline-block h-2 w-2 rounded-full bg-primary/60" /> Scheduled · <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/50" /> Sent</p>
+        </div>
+        <button onClick={() => run(true)} disabled={busy} className={btn}><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> {busy ? "Refreshing…" : "Refresh"}</button>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button className={btn} onClick={() => step(-1)} aria-label="Previous"><ChevronLeft className="h-4 w-4" /></button>
-        <button className={btn} onClick={() => setAnchor(today)}>Today</button>
-        <button className={btn} onClick={() => step(1)} aria-label="Next"><ChevronRight className="h-4 w-4" /></button>
-        <p className="mr-auto font-display text-xl text-foreground">{title}</p>
-        <div className="inline-flex rounded-full border border-border p-0.5">
-          {(["month", "week"] as const).map((m) => (
-            <button key={m} onClick={() => setMode(m)} className={`h-8 rounded-full px-3 text-sm capitalize ${mode === m ? "bg-primary text-primary-foreground" : "text-foreground"}`}>{m}</button>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button className={btn} onClick={() => { step(-1); setPicked(null); }} aria-label="Previous period"><ChevronLeft className="h-4 w-4" /></button>
+          <h2 className="min-w-44 text-center text-lg font-medium text-foreground">{title}</h2>
+          <button className={btn} onClick={() => { step(1); setPicked(null); }} aria-label="Next period"><ChevronRight className="h-4 w-4" /></button>
+          <button className={btn} onClick={() => { setAnchor(today); setPicked(null); }}>Today</button>
+        </div>
+        <div className="flex gap-1">
+          {(["month", "week", "list"] as const).map((m) => (
+            <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={`h-9 rounded-md px-3 text-sm capitalize ${mode === m ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted"}`}>{m}</button>
           ))}
         </div>
-        <select value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Filter by channel" className="h-9 max-w-full rounded-full border border-border bg-card px-3 text-sm text-foreground">
+      </div>
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <select value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Filter by channel" className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground">
           <option value="all">All channels</option>
           {channels.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.service})</option>)}
         </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Filter by status" className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground">
+          <option value="all">All statuses</option><option value="scheduled">Scheduled</option><option value="sent">Sent</option>
+        </select>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">Times shown in {tz}. <span className="inline-block h-2 w-2 rounded-full bg-primary/60" /> Scheduled · <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/50" /> Sent</p>
 
       {stale && <p role="status" className="mt-4 rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Buffer is busy, showing saved data.</p>}
       {reconnect && <div className="mt-6 rounded-2xl border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p>{Reconnect()}</div>}
@@ -142,9 +164,68 @@ export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string)
 
       {ok && (
         <>
-          {!rangeHasPosts && <p className="mt-4 text-sm text-muted-foreground">Nothing scheduled this {mode}.</p>}
-          {/* Desktop grid */}
-          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
+          {mode === "week" && !rangeHasPosts && <p className="mt-4 text-sm text-muted-foreground">Nothing scheduled this {mode}.</p>}
+          {mode === "month" && (() => {
+            const sel = picked && days.includes(picked) ? picked : null;
+            const visible = sel ? [sel] : days.filter((k) => inRange(k) && byDay.has(k));
+            const label = (k: string) => keyLabel(k, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+            return (
+              <div className={`mt-4 grid min-w-0 gap-8 ${agenda ? "lg:grid-cols-2" : ""}`}>
+                <div className="min-w-0">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <span className="text-sm text-muted-foreground">{tz}</span>
+                    <div className="flex gap-1 rounded-md border border-border p-1" role="group" aria-label="Calendar layout">
+                      <button aria-label="Calendar only" title="Calendar only" aria-pressed={!agenda} onClick={() => setAgenda(false)} className={`rounded p-1.5 ${!agenda ? "bg-muted text-foreground" : "text-muted-foreground"}`}><Grid2X2 className="h-4 w-4" /></button>
+                      <button aria-label="Calendar and posts" title="Calendar and posts" aria-pressed={agenda} onClick={() => setAgenda(true)} className={`rounded p-1.5 ${agenda ? "bg-muted text-foreground" : "text-muted-foreground"}`}><Columns3 className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                    {WEEKDAYS.map((d) => <div key={d} className="rounded-md bg-muted py-2 text-center text-xs text-muted-foreground">{d}</div>)}
+                    {days.map((k) => {
+                      const count = byDay.get(k)?.length ?? 0;
+                      return (
+                        <button key={k} type="button" aria-label={`${label(k)}, ${count} posts`} aria-pressed={sel === k} onClick={() => { setPicked(k); setAgenda(true); }}
+                          className={`group relative h-16 min-w-0 rounded-lg border text-sm ${sel === k ? "border-primary bg-muted text-foreground" : inRange(k) ? "border-transparent bg-card text-foreground hover:bg-muted/60" : "border-transparent bg-muted/40 text-muted-foreground"} ${k === today ? "font-semibold text-primary" : ""}`}>
+                          {+k.slice(8)}
+                          {count > 0 && <span className="absolute bottom-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-foreground transition-transform group-hover:scale-110 motion-reduce:transition-none">{count}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {agenda && (
+                  <div className="min-w-0">
+                    <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-lg font-semibold text-foreground">{sel ? label(sel) : "Planned posts"}</h3>
+                      <div className="flex gap-2">
+                        {sel && sel >= today && <button className={btn} onClick={() => create(sel)}><Plus className="h-4 w-4" /> New post</button>}
+                        {sel && <button className={btn} onClick={() => setPicked(null)}>All days</button>}
+                      </div>
+                    </div>
+                    <div className="max-h-[34rem] space-y-5 overflow-y-auto overscroll-contain pr-1">
+                      {visible.some((k) => byDay.has(k)) ? visible.map((k) => byDay.has(k) && (
+                        <div key={k}>
+                          {!sel && <h4 className="mb-2 text-xs font-medium text-muted-foreground">{label(k)} · {tz}</h4>}
+                          <div className="space-y-3">{byDay.get(k)!.map((p) => <PostCard key={p.id} p={p} tz={tz} onOpen={setOpen} />)}</div>
+                        </div>
+                      )) : (
+                        <div className="flex min-h-60 flex-col items-center justify-center gap-3 text-sm text-muted-foreground"><CalendarDays className="size-8" aria-hidden="true" />No posts{sel ? " for this day" : " this month"}.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {mode === "list" && (
+            <div className="mt-4 space-y-3">
+              {days.some((k) => inRange(k) && byDay.has(k))
+                ? days.filter((k) => inRange(k)).flatMap((k) => byDay.get(k) ?? []).map((p) => <PostCard key={p.id} p={p} tz={tz} onOpen={setOpen} />)
+                : <div className="flex min-h-60 flex-col items-center justify-center gap-3 text-sm text-muted-foreground"><CalendarDays className="size-8" aria-hidden="true" />No posts this month.</div>}
+            </div>
+          )}
+          {/* Week grid */}
+          {mode === "week" && <><div className="mt-4 hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
             <div className="grid grid-cols-7 border-b border-border">
               {WEEKDAYS.map((d) => <div key={d} className="px-2 py-2 text-xs uppercase tracking-widest text-muted-foreground">{d}</div>)}
             </div>
@@ -179,7 +260,7 @@ export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string)
                 <div className="mt-2 space-y-1">{(byDay.get(k) ?? []).map((p) => <Chip key={p.id} p={p} onOpen={setOpen} />)}</div>
               </li>
             ))}
-          </ul>
+          </ul></>}
           {(ok.scheduled.hasMore || ok.sent.hasMore) && <p className="mt-3 text-xs text-muted-foreground">Showing the 50 most recent scheduled and sent posts.</p>}
         </>
       )}
