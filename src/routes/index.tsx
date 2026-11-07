@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal } from "lucide-react";
+import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BeforeAfter } from "@/components/before-after";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
@@ -20,8 +20,6 @@ const SIGN_IN_CLASS =
 // missing image shows a clearly labeled placeholder instead.
 const SHOWCASE: { style: string; before: string | null; after: string | null }[] = [
   { style: "Clean", before: null, after: null },
-  { style: "Warm", before: null, after: null },
-  { style: "Bright", before: null, after: null },
   { style: "Calm", before: null, after: null },
 ];
 
@@ -33,8 +31,8 @@ const STEPS = [
   },
   {
     icon: Wand2,
-    title: "Magic Photo and Photo to Post",
-    body: "Synora improves the photo and writes a caption with hashtags from what is visible in it.",
+    title: "Improve and write",
+    body: "Use Magic Photo, Photo to Post or Magic Caption, only when you tap them.",
   },
   {
     icon: Save,
@@ -45,20 +43,34 @@ const STEPS = [
 
 const FEATURES = [
   {
+    icon: Wand2,
     title: "Magic Photo",
-    body: "Improves light, color and background. It never changes your product, and never adds people, text or logos.",
+    body: "Improves light, color and background. It never changes your product.",
   },
   {
+    icon: ImagePlus,
     title: "Photo to Post",
-    body: "Writes the caption and hashtags from what is visible in the photo — no invented facts or claims.",
+    body: "Writes a caption and hashtags from what is visible in the photo.",
   },
   {
+    icon: Type,
     title: "Magic Caption",
-    body: "Polishes your text in your language, keeping your meaning, links and hashtags.",
+    body: "Polishes your text in your own language, keeping meaning, links and hashtags.",
   },
   {
+    icon: Images,
+    title: "Media for every channel",
+    body: "Upload JPG, PNG or WebP photos, with limits that follow the channel you choose.",
+  },
+  {
+    icon: FileText,
+    title: "Drafts first",
+    body: "Save as a draft to Buffer and review before anything goes out.",
+  },
+  {
+    icon: Send,
     title: "Publish now",
-    body: "Posts immediately, only when you confirm. Everything else stays a draft until you decide.",
+    body: "Posts immediately, only when you confirm.",
   },
 ];
 
@@ -97,10 +109,10 @@ function Index() {
       <div className="mx-auto w-full max-w-5xl px-6">
         <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
           <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
-            Make your photos post-ready. Calmly.
+            Write, polish and save your social posts. Calmly.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-            Synora improves your photo, writes the caption and saves it to Buffer as a draft.
+            Synora improves your photos, writes and refines your captions, and saves everything to Buffer as a draft.
           </p>
 
           {error && (
@@ -133,7 +145,7 @@ function Index() {
           <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
             Drag the handle to compare each photo before and after Magic Photo.
           </p>
-          <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2">
+          <div className="mx-auto mt-10 grid max-w-3xl grid-cols-1 gap-8 sm:grid-cols-2">
             {SHOWCASE.map((item) => (
               <BeforeAfter key={item.style} before={item.before} after={item.after} style={item.style} />
             ))}
@@ -141,6 +153,18 @@ function Index() {
           <p className="mt-6 text-center text-xs text-muted-foreground">
             Real results from Synora's Magic Photo. Your results may vary.
           </p>
+
+          <div className="mx-auto mt-12 max-w-3xl">
+            <h3 className="text-center font-display text-2xl text-foreground">Magic Caption</h3>
+            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {["Before", "After"].map((tag) => (
+                <div key={tag} className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+                  <span className="text-xs uppercase tracking-widest text-muted-foreground">{tag}</span>
+                  <p className="mt-3 text-sm text-muted-foreground">Example text coming soon</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="border-t border-border py-16 sm:py-20">
@@ -162,14 +186,17 @@ function Index() {
         </section>
 
         <section className="border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">What Synora does</h2>
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (
               <div
                 key={feature.title}
                 className="rounded-2xl border border-border bg-card p-6 shadow-soft"
               >
-                <h3 className="text-base font-semibold text-foreground">{feature.title}</h3>
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-primary">
+                  <feature.icon className="h-4 w-4" aria-hidden />
+                </span>
+                <h3 className="mt-4 text-base font-semibold text-foreground">{feature.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{feature.body}</p>
               </div>
             ))}
