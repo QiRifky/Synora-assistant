@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
+import { useState } from "react";
+import { ShieldCheck, Lock, HandMetal, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SynoraFlow } from "@/components/synora-flow";
 import { BeforeAfter } from "@/components/before-after";
-import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
 import { Header } from "@/components/ui/header-1";
@@ -16,8 +15,8 @@ const MESSAGES: Record<string, string> = {
   account_lookup: "We signed you in with Buffer but couldn't read your Buffer account. Please try again in a moment.",
 };
 
-const SIGN_IN_CLASS =
-  "inline-flex h-12 items-center rounded-full bg-primary px-8 text-base font-medium text-primary-foreground shadow-soft motion-safe:transition-transform motion-safe:hover:-translate-y-0.5";
+const PRIMARY_BTN =
+  "inline-flex h-12 items-center rounded-[4px] bg-primary px-6 text-base font-medium text-primary-foreground hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 // Example before/after pairs. Add real photo URLs here when available; a
 // missing image shows a clearly labeled placeholder instead.
@@ -27,54 +26,24 @@ const SHOWCASE: { style: string; before: string | null; after: string | null }[]
 ];
 
 const STEPS = [
-  {
-    icon: ImagePlus,
-    title: "Upload a photo",
-    body: "Add a product or lifestyle photo to a new post.",
-  },
-  {
-    icon: Wand2,
-    title: "Improve and write",
-    body: "Use Magic Photo, Photo to Post or Magic Caption, only when you tap them.",
-  },
-  {
-    icon: Save,
-    title: "Review and save to Buffer",
-    body: "Read everything, change what you like, then save it to Buffer as a draft.",
-  },
+  { title: "Upload a photo", body: "Add a product or lifestyle photo to a new post." },
+  { title: "Improve and write", body: "Use Magic Photo, Photo to Post or Magic Caption, only when you tap them." },
+  { title: "Review and save to Buffer", body: "Read everything, change what you like, then save it to Buffer as a draft." },
 ];
 
 const FEATURES = [
-  {
-    icon: Wand2,
-    title: "Magic Photo",
-    body: "Improves light, color and background. It never changes your product.",
-  },
-  {
-    icon: ImagePlus,
-    title: "Photo to Post",
-    body: "Writes a caption and hashtags from what is visible in the photo.",
-  },
-  {
-    icon: Type,
-    title: "Magic Caption",
-    body: "Polishes your text in your own language, keeping meaning, links and hashtags.",
-  },
-  {
-    icon: Images,
-    title: "Media for every channel",
-    body: "Upload JPG, PNG or WebP photos, with limits that follow the channel you choose.",
-  },
-  {
-    icon: FileText,
-    title: "Drafts first",
-    body: "Save as a draft to Buffer and review before anything goes out.",
-  },
-  {
-    icon: Send,
-    title: "Publish now",
-    body: "Posts immediately, only when you confirm.",
-  },
+  { title: "Magic Photo", body: "Improves light, color and background. It never changes your product." },
+  { title: "Photo to Post", body: "Writes a caption and hashtags from what is visible in the photo." },
+  { title: "Magic Caption", body: "Polishes your text in your own language, keeping meaning, links and hashtags." },
+  { title: "Drafts first", body: "Save as a draft to Buffer and review before anything goes out." },
+];
+
+const FAQ = [
+  { q: "Does Synora publish automatically?", a: "No. Everything stays a draft until you confirm." },
+  { q: "Do I need a Buffer account?", a: "Yes, you sign in with Buffer." },
+  { q: "Which channels can I use?", a: "The channels connected in your Buffer account, depending on your plan." },
+  { q: "Does Magic Photo change my product?", a: "No. It improves light, color and background only, and your original is always kept." },
+  { q: "Are there limits?", a: "Daily usage limits keep the AI features fair for everyone." },
 ];
 
 // Simple inline SVG marks in one calm green, matching the Synora style.
@@ -95,10 +64,6 @@ const PLATFORM_PATHS: Record<string, string> = {
 
 const PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "X", "TikTok", "Pinterest"] as const;
 
-const CHANNEL_ICONS: FolderIcon[] = PLATFORMS.map((name) => ({
-  label: name,
-  node: <svg viewBox="0 0 24 24" aria-hidden="true"><path d={PLATFORM_PATHS[name]} /></svg>,
-}));
 
 const TRUST = [
   { icon: HandMetal, text: "Your original photo is always kept until you choose" },
@@ -125,157 +90,206 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const WRAP = "mx-auto w-full max-w-[1100px] px-6";
+const SECTION = "py-16 md:py-24";
+const H2 = "text-3xl font-medium tracking-[-0.025em] sm:text-4xl";
+
+function HeroVisual() {
+  const cards = [
+    { tag: "Write", line: "An idea becomes a first draft." },
+    { tag: "Polish", line: "Same meaning, a clearer voice." },
+    { tag: "Save", line: "Saved to Buffer as a draft." },
+  ];
+  return (
+    <div className="rounded-xl bg-muted p-5 sm:p-8" aria-hidden>
+      <div className="grid grid-cols-3 gap-3 sm:gap-5">
+        {cards.map((c, i) => (
+          <div key={c.tag} className="rounded-xl border border-border bg-card p-3 shadow-soft sm:p-5">
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${i === 2 ? "bg-landing-accent" : "bg-foreground/30"}`} />
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{c.tag}</span>
+            </div>
+            <div className="mt-3 space-y-1.5 sm:mt-4">
+              <div className="h-1.5 w-full rounded bg-muted" />
+              <div className="h-1.5 w-4/5 rounded bg-muted" />
+              <div className="hidden h-1.5 w-3/5 rounded bg-muted sm:block" />
+            </div>
+            <p className="mt-3 hidden text-sm text-foreground sm:block">{c.line}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   const { error, retry } = Route.useSearch();
   const { remaining, startSignIn } = useSignInCooldown(error === "rate_limited", retry);
   const waiting = remaining > 0;
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   return (
-    <div id="top" className="bg-background text-foreground">
+    <div id="top" className="landing bg-background text-foreground antialiased">
       <Header onSignIn={startSignIn} remaining={remaining} />
       <main>
-      <SynoraFlow
-        onIntroCta={startSignIn}
-        introCtaDisabled={waiting}
-        introExtra={
-          <>
+        <section className="bg-background pb-16 pt-6 md:pb-24 md:pt-8">
+          <div className={WRAP}>
+            <HeroVisual />
+            <h1 className="mt-8 text-4xl font-medium leading-[1.1] tracking-[-0.025em] sm:text-5xl">
+              Write, polish and save your social posts.
+              <span className="block text-landing-subtle">Calmly.</span>
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+              Synora improves your photos, writes and refines your captions, and saves everything to Buffer as a draft.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <Button disabled={waiting} onClick={startSignIn} className={PRIMARY_BTN}>Sign in with Buffer</Button>
+              <a href="#how-it-works" className="rounded-[4px] px-2 py-3 text-base font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">See how it works</a>
+            </div>
             {error && (
-              <div
-                role="alert"
-                className="mt-6 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm text-foreground"
-              >
+              <div role="alert" className="mt-6 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm">
                 <p>
                   {error === "rate_limited" && retry
                     ? `Buffer is receiving too many requests right now. ${rateLimitWaitMessage(retry)}.`
                     : MESSAGES[error] ?? "Something went wrong while signing you in."}
                 </p>
                 {waiting && <p className="mt-2 text-xs text-muted-foreground" role="timer">Sign-in available in {waitCountdown(remaining)}</p>}
-                <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium underline underline-offset-4">
-                  Try again
-                </Button>
+                <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium text-landing-accent underline underline-offset-4">Try again</Button>
               </div>
             )}
-            <p className="mt-4 text-sm text-muted-foreground">
-              Nothing is ever published without your approval.
-            </p>
-          </>
-        }
-      />
-      <div className="mx-auto w-full max-w-5xl px-6">
-        <section className="border-t border-border py-16 sm:py-20">
-          <h2 className="text-center font-display text-3xl text-foreground sm:text-4xl">See the difference</h2>
-          <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
-            Drag the handle to compare each photo before and after Magic Photo.
-          </p>
-          <div className="mx-auto mt-10 grid max-w-3xl grid-cols-1 gap-8 sm:grid-cols-2">
-            {SHOWCASE.map((item) => (
-              <BeforeAfter key={item.style} before={item.before} after={item.after} style={item.style} />
-            ))}
+            <p className="mt-4 text-sm text-muted-foreground">Nothing is ever published without your approval.</p>
           </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Real results from Synora's Magic Photo. Your results may vary.
-          </p>
+        </section>
 
-          <div className="mx-auto mt-12 max-w-3xl">
-            <h3 className="text-center font-display text-2xl text-foreground">Magic Caption</h3>
-            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-              {["Before", "After"].map((tag) => (
-                <div key={tag} className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground">{tag}</span>
-                  <p className="mt-3 text-sm text-muted-foreground">Example text coming soon</p>
-                </div>
-              ))}
+        <section id="features" className={`landing-grey scroll-mt-16 bg-background ${SECTION}`}>
+          <div className={WRAP}>
+            <h2 className={H2}>Everything in one calm place</h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">Tools that help you post, only when you ask for them.</p>
+            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {FEATURES.map((f, i) => {
+                const on = activeFeature === i;
+                return (
+                  <div key={f.title} tabIndex={0} onMouseEnter={() => setActiveFeature(i)} onFocus={() => setActiveFeature(i)}
+                    className={`flex min-h-56 flex-col justify-between rounded-xl border p-6 outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${on ? "border-transparent bg-landing-accent text-primary-foreground" : "border-border bg-card"}`}>
+                    <h3 className="text-base font-medium">{f.title}</h3>
+                    <p className={`mt-8 text-sm leading-relaxed ${on ? "" : "text-muted-foreground"}`}>{f.body}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
 
-        <section id="how-it-works" className="scroll-mt-20 border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">How it works</h2>
-          <ol className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3">
-            {STEPS.map((step, index) => (
-              <li key={step.title}>
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-primary">
-                    <step.icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <span className="font-display text-2xl text-primary">{index + 1}</span>
-                </div>
-                <h3 className="mt-4 text-base font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-      </div>
-      <div className="mx-auto w-full max-w-5xl px-6">
-        <section id="channels" className="grid scroll-mt-20 grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
-          <div className="min-w-0 text-left">
-            <h2 className="font-display text-3xl text-foreground sm:text-4xl">
-              Works with the channels you already use in Buffer
-            </h2>
-            <p className="mt-4 max-w-xl text-base text-muted-foreground">
-              Buffer connects to many social platforms. Connect them in Buffer, and Synora helps you
-              write and save posts for them.
-            </p>
-            <p className="mt-8 max-w-xl text-xs text-muted-foreground">
-              Available channels depend on your Buffer account and plan.
-            </p>
-          </div>
-          <div className="mt-12 flex min-w-0 justify-center lg:mt-0">
-            <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} />
-          </div>
-        </section>
-
-        <section id="features" className="scroll-mt-20 border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl border border-border bg-card p-6 shadow-soft"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-primary">
-                  <feature.icon className="h-4 w-4" aria-hidden />
-                </span>
-                <h3 className="mt-4 text-base font-semibold text-foreground">{feature.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{feature.body}</p>
+        <section className={`landing-dark bg-background text-foreground ${SECTION}`}>
+          <div className={WRAP}>
+            <h2 className={H2}>See the difference</h2>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">Drag the handle to compare each photo before and after Magic Photo.</p>
+            <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-2">
+              {SHOWCASE.map((item) => <BeforeAfter key={item.style} before={item.before} after={item.after} style={item.style} />)}
+            </div>
+            <p className="mt-6 text-xs text-muted-foreground">Real results from Synora's Magic Photo. Your results may vary.</p>
+            <div className="mt-12">
+              <h3 className="text-xl font-medium tracking-tight">Magic Caption</h3>
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {["Before", "After"].map((tag) => (
+                  <div key={tag} className="rounded-xl border border-border bg-card p-6">
+                    <span className="text-xs uppercase tracking-widest text-muted-foreground">{tag}</span>
+                    <p className="mt-3 text-sm text-muted-foreground">Example text coming soon</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
-        <section className="border-t border-border py-16 sm:py-20">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Calm by default</h2>
-          <ul className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {TRUST.map((point) => (
-              <li key={point.text} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
-                  <point.icon className="h-4 w-4" aria-hidden />
-                </span>
-                <p className="text-sm text-foreground">{point.text}</p>
-              </li>
-            ))}
-          </ul>
+        <section id="how-it-works" className={`scroll-mt-16 bg-background ${SECTION}`}>
+          <div className={WRAP}>
+            <h2 className={H2}>How it works</h2>
+            <ol className="mt-10 divide-y divide-border border-y border-border">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="grid grid-cols-[2.5rem_1fr] gap-4 py-6 md:grid-cols-[4rem_1fr_1.4fr] md:items-baseline">
+                  <span className="text-lg font-medium text-landing-accent">{i + 1}</span>
+                  <h3 className="text-lg font-medium">{step.title}</h3>
+                  <p className="col-start-2 text-base leading-relaxed text-muted-foreground md:col-start-3">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
-        <section className="border-t border-border py-20 text-center sm:py-24">
-          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Ready when you are.</h2>
-          <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-8`}>
-            Sign in with Buffer
-          </Button>
+        <section id="channels" className={`landing-dark scroll-mt-16 bg-background text-foreground ${SECTION}`}>
+          <div className={`${WRAP} grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-center lg:gap-16`}>
+            <div>
+              <h2 className={H2}>Works with the channels you already use in Buffer</h2>
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
+                Buffer connects to many social platforms. Connect them in Buffer, and Synora helps you write and save posts for them.
+              </p>
+              <p className="mt-8 max-w-xl text-xs text-muted-foreground">
+                Available channels depend on your Buffer account and plan. Synora is not affiliated with or endorsed by these platforms.
+              </p>
+            </div>
+            <ul className="grid grid-cols-3 gap-3 rounded-xl border border-border bg-card p-5 sm:gap-4 sm:p-6">
+              {PLATFORMS.map((name) => (
+                <li key={name} className="flex flex-col items-center gap-3 rounded-xl bg-background px-2 py-5">
+                  <svg viewBox="0 0 24 24" role="img" aria-label={name} className="h-7 w-7 fill-current"><path d={PLATFORM_PATHS[name]} /></svg>
+                  <span className="text-xs text-muted-foreground">{name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
-      </div>
 
+        <section className={`landing-grey bg-background ${SECTION}`}>
+          <div className={WRAP}>
+            <h2 className={H2}>Calm by default</h2>
+            <ul className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+              {TRUST.map((point) => (
+                <li key={point.text} className="flex items-start gap-3 rounded-xl border border-border bg-card p-6">
+                  <point.icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+                  <p className="text-base leading-relaxed">{point.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section id="faq" className={`scroll-mt-16 bg-background ${SECTION}`}>
+          <div className={`${WRAP} grid grid-cols-1 gap-10 lg:grid-cols-[1fr_1.6fr]`}>
+            <div>
+              <h2 className={H2}>Questions before you start</h2>
+              <Button disabled={waiting} onClick={startSignIn} className={`${PRIMARY_BTN} mt-8`}>Sign in with Buffer</Button>
+            </div>
+            <div className="divide-y divide-border border-y border-border">
+              {FAQ.map((item, i) => {
+                const open = openFaq === i;
+                return (
+                  <div key={item.q}>
+                    <h3>
+                      <button type="button" id={`faq-q-${i}`} aria-expanded={open} aria-controls={`faq-a-${i}`} onClick={() => setOpenFaq(open ? null : i)}
+                        className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {item.q}
+                        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden />
+                      </button>
+                    </h3>
+                    <div id={`faq-a-${i}`} role="region" aria-labelledby={`faq-q-${i}`} hidden={!open} className="pb-5 text-base leading-relaxed text-muted-foreground">{item.a}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
       </main>
-      <footer className="border-t border-border py-8">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
-          <p className="max-w-md text-center text-xs sm:text-left">
-            Synora is an independent app that works with Buffer. Not affiliated with Buffer.
-          </p>
-          <div className="flex gap-6">
-            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link to="/terms" className="hover:text-foreground">Terms</Link>
+      <footer className="landing-dark bg-background py-16 text-foreground">
+        <div className={`${WRAP} flex flex-col gap-8 md:flex-row md:justify-between`}>
+          <div>
+            <p className="text-lg font-semibold tracking-tight">Synora</p>
+            <p className="mt-2 text-sm text-muted-foreground">Calm clarity for your Buffer social publishing.</p>
+            <p className="mt-6 max-w-md text-xs text-muted-foreground">Synora is an independent app that works with Buffer. Not affiliated with Buffer.</p>
+          </div>
+          <div className="flex gap-6 text-sm">
+            <Link to="/privacy" className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Privacy</Link>
+            <Link to="/terms" className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Terms</Link>
           </div>
         </div>
       </footer>
