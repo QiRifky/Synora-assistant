@@ -6,6 +6,6 @@ describe("Dashboard sidebar destinations", () => {
     const drafts = NAV.find((n) => n.id === "drafts");
 
     expect(drafts?.label).toBe("Drafts");
-    expect(NAV.map((n) => n.id)).toEqual(["overview", "channels", "posts", "drafts", "calendar", "ideas", "discover"]);
+    expect(NAV.map((n) => n.id)).toEqual(["overview", "channels", "posts", "drafts", "calendar", "ideas", "discover", "photo"]);
   });
 });
