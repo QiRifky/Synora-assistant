@@ -6,7 +6,8 @@ import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSumm
 import { getDashboardData, type DashboardData } from "@/lib/dashboard.functions";
 import { formatBytes } from "@/lib/media-limits";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { SidebarNav } from "@/components/ui/dashboard-sidebar";
+import { SidebarNav, type NavGroupData } from "@/components/ui/dashboard-sidebar";
+import { Sparkles, CalendarClock, SlidersHorizontal } from "lucide-react";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Radio, FileText, FileEdit, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
@@ -272,6 +273,14 @@ export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "discover", label: "Discover", icon: Compass },
+];
+
+const navItem = (id: View) => { const n = NAV.find((x) => x.id === id)!; return { id: n.id, title: n.label, icon: n.icon }; };
+const NAV_GROUPS: NavGroupData<View>[] = [
+  { items: [navItem("overview")] },
+  { heading: "Create", icon: Sparkles, items: [navItem("ideas"), navItem("discover")] },
+  { heading: "Plan & Ship", icon: CalendarClock, items: [navItem("posts"), navItem("drafts"), navItem("calendar")] },
+  { heading: "Set up", icon: SlidersHorizontal, items: [navItem("channels")] },
 ];
 
 function PageHeader({ title, onRefresh, busy }: { title: string; onRefresh?: () => void; busy?: boolean }) {
@@ -814,14 +823,17 @@ function AppPage() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
-        <SidebarNav groups={[{ items: NAV.map((n) => ({ id: n.id, title: n.label, icon: n.icon })) }]} activeId={view} onSelect={setView} settingsId="settings" email={email} onSignOut={signOut} />
+        <SidebarNav groups={NAV_GROUPS} activeId={view} onSelect={setView} settingsId="settings" email={email} onSignOut={signOut} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
-            <SidebarTrigger title="Toggle navigation" />
-            <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto md:hidden" />
-            <span className="hidden truncate text-[13px] text-muted-foreground md:block">{NAV.find((n) => n.id === view)?.label ?? "Settings"}</span>
+          <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-10">
+            <div className="flex min-w-0 items-center gap-3">
+              <SidebarTrigger title="Toggle navigation" className="md:hidden" />
+              <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto md:hidden" />
+              <span className="hidden truncate text-xs text-muted-foreground md:block">Workspace / {NAV.find((n) => n.id === view)?.label ?? "Settings"}</span>
+            </div>
+            <span className="hidden text-xs text-muted-foreground md:block">Write, polish and save — calmly.</span>
           </header>
-          <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-9 md:px-10 md:py-12">
             {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} userId={user.id} />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}
@@ -831,6 +843,10 @@ function AppPage() {
             {view === "discover" && <DiscoverView />}
             {view === "settings" && <SettingsView email={email} onSignOut={signOut} />}
           </main>
+          <footer className="mx-5 mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border py-6 text-xs text-muted-foreground md:mx-10">
+            <span>Built on the Buffer API. Not an official Buffer product.</span>
+            <div className="flex gap-5"><a href="/privacy" className="hover:text-foreground">Privacy Policy</a><a href="/terms" className="hover:text-foreground">Terms</a></div>
+          </footer>
         </div>
       </div>
     </SidebarProvider>
