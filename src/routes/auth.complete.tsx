@@ -5,7 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/auth/complete")({
   ssr: false,
   validateSearch: (s: Record<string, unknown>) => ({ token_hash: String(s["token_hash"] ?? "") }),
-  head: () => ({ meta: [{ title: "Signing you in — Synora" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [
+    { title: "Signing you in — Synora" },
+    { name: "description", content: "Complete your secure Buffer sign-in to Synora." },
+    { property: "og:title", content: "Signing you in — Synora" },
+    { property: "og:description", content: "Complete your secure Buffer sign-in to Synora." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+    { name: "robots", content: "noindex" },
+  ] }),
   component: Complete,
 });
 

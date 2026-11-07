@@ -30,6 +30,7 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Project rules
+- Dashboard navigation uses the configurable `src/components/ui/dashboard-sidebar.tsx` with existing shadcn sidebar state and real app destinations; omit template-only workspaces and mock features to preserve Synora behavior.
 - Landing navigation uses the reusable Header with existing section anchors and the page's shared sign-in cooldown; the mobile dialog provides focus trapping and scroll locking without service calls.
 - Reusable animated folder UI lives in `src/components/ui/icon-folder.tsx`, uses global semantic CSS materials and browser observers only after hydration; landing-page platform data supplies its marks without API calls.
 - Sign-in rate-limit query values are already minutes; preserve sub-minute precision and a per-tab deadline so reloads do not restart the cooldown, while Buffer routes stay unchanged.

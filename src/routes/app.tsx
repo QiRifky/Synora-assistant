@@ -3,15 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSummary, type PostStatus } from "@/lib/buffer.functions";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarNav } from "@/components/ui/dashboard-sidebar";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, CalendarDays, RefreshCw, LogOut, ExternalLink, Settings } from "lucide-react";
+import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
 import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 import synoraLogo from "@/assets/synora-logo.png.asset.json";
-import { SynoraLogo } from "@/components/synora-logo";
 
 import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
 
@@ -516,45 +516,6 @@ function DiscoverView() {
   );
 }
 
-function AppSidebar({ view, setView, email, onSignOut }: { view: View; setView: (v: View) => void; email: string; onSignOut: () => void }) {
-  const { setOpenMobile } = useSidebar();
-  return (
-    <Sidebar>
-      <SidebarHeader className="px-4 py-5">
-        <SynoraLogo className="self-start" />
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV.map((n) => (
-                <SidebarMenuItem key={n.id}>
-                  <SidebarMenuButton isActive={view === n.id} onClick={() => { setView(n.id); setOpenMobile(false); }}>
-                    <n.icon className="h-4 w-4" /> <span>{n.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton isActive={view === "settings"} onClick={() => { setView("settings"); setOpenMobile(false); }}>
-              <Settings className="h-4 w-4" /> <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <p className="truncate text-xs text-muted-foreground" title={email}>{email}</p>
-        <button onClick={onSignOut} className="mt-2 inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm text-foreground hover:bg-muted">
-          <LogOut className="h-4 w-4" /> Sign out
-        </button>
-      </SidebarFooter>
-    </Sidebar>
-  );
-}
-
 function AppPage() {
   const { user } = Route.useRouteContext();
   const navigate = useNavigate();
@@ -571,11 +532,12 @@ function AppPage() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
-        <AppSidebar view={view} setView={setView} email={email} onSignOut={signOut} />
+        <SidebarNav groups={[{ items: NAV.map((n) => ({ id: n.id, title: n.label, icon: n.icon })) }]} activeId={view} onSelect={setView} settingsId="settings" email={email} onSignOut={signOut} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-12 items-center gap-2 border-b border-border px-3 md:hidden">
-            <SidebarTrigger />
-            <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto" />
+          <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
+            <SidebarTrigger title="Toggle navigation" />
+            <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto md:hidden" />
+            <span className="hidden truncate text-[13px] text-muted-foreground md:block">{NAV.find((n) => n.id === view)?.label ?? "Settings"}</span>
           </header>
           <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
             {view === "overview" && <OverviewView />}
