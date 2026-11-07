@@ -5,7 +5,6 @@ import { BeforeAfter } from "@/components/before-after";
 import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
-import heroImg from "@/assets/hero-calm-publishing.jpg";
 
 const MESSAGES: Record<string, string> = {
   access_denied: "Looks like the Buffer sign-in was cancelled.",
@@ -132,48 +131,37 @@ function Index() {
   return (
     <main className="bg-background text-foreground">
       <div className="mx-auto w-full max-w-5xl px-6">
-        <section className="grid items-center gap-12 py-20 sm:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-          <div className="text-center lg:text-left">
-            <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
-              Write, polish and save your social posts. Calmly.
-            </h1>
-            <p className="mt-6 max-w-xl text-lg text-muted-foreground lg:max-w-none">
-              Synora improves your photos, writes and refines your captions, and saves everything to Buffer as a draft.
-            </p>
+        <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
+          <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
+            Write, polish and save your social posts. Calmly.
+          </h1>
+          <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+            Synora improves your photos, writes and refines your captions, and saves everything to Buffer as a draft.
+          </p>
 
-            {error && (
-              <div
-                role="alert"
-                className="mx-auto mt-8 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm text-foreground lg:mx-0"
-              >
-                <p>
-                  {error === "rate_limited" && retry
-                    ? `Buffer is receiving too many requests right now. ${rateLimitWaitMessage(retry)}.`
-                    : MESSAGES[error] ?? "Something went wrong while signing you in."}
-                </p>
-                {waiting && <p className="mt-2 text-xs text-muted-foreground" role="timer">Sign-in available in {waitCountdown(remaining)}</p>}
-                <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium underline underline-offset-4">
-                  Try again
-                </Button>
-              </div>
-            )}
+          {error && (
+            <div
+              role="alert"
+              className="mt-8 w-full max-w-md rounded-xl border border-border bg-muted px-5 py-4 text-sm text-foreground"
+            >
+              <p>
+                {error === "rate_limited" && retry
+                  ? `Buffer is receiving too many requests right now. ${rateLimitWaitMessage(retry)}.`
+                  : MESSAGES[error] ?? "Something went wrong while signing you in."}
+              </p>
+              {waiting && <p className="mt-2 text-xs text-muted-foreground" role="timer">Sign-in available in {waitCountdown(remaining)}</p>}
+              <Button variant="link" disabled={waiting} onClick={startSignIn} className="mt-2 h-auto p-0 font-medium underline underline-offset-4">
+                Try again
+              </Button>
+            </div>
+          )}
 
-            <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-10`}>
-              Sign in with Buffer
-            </Button>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Nothing is ever published without your approval.
-            </p>
-          </div>
-          <div className="mx-auto w-full max-w-md lg:max-w-none">
-            <img
-              src={heroImg}
-              alt="Illustration: a photo being gently polished and saved as a neat stack of draft posts in a green folder."
-              width={1200}
-              height={1008}
-              className="h-auto w-full rounded-3xl border border-border shadow-soft"
-            />
-          </div>
+          <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-10`}>
+            Sign in with Buffer
+          </Button>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Nothing is ever published without your approval.
+          </p>
         </section>
 
         <section className="border-t border-border py-16 sm:py-20">
