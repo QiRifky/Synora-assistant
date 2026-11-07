@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SynoraFlow } from "@/components/synora-flow";
 import { BeforeAfter } from "@/components/before-after";
 import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
@@ -130,7 +129,7 @@ function Index() {
   const waiting = remaining > 0;
 
   return (
-    <main id="top" className="bg-background text-foreground">
+    <main className="bg-background text-foreground">
       <div className="mx-auto w-full max-w-5xl px-6">
         <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
           <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
@@ -210,9 +209,6 @@ function Index() {
           </ol>
         </section>
 
-      </div>
-      <SynoraFlow />
-      <div className="mx-auto w-full max-w-5xl px-6">
         <section className="grid grid-cols-1 border-t border-border py-16 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div className="min-w-0 text-left">
             <h2 className="font-display text-3xl text-foreground sm:text-4xl">
