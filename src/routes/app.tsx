@@ -13,233 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Radio, FileText, FileEdit, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
 import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
-import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
 import synoraLogo from "@/assets/synora-logo.png.asset.json";
-
-import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
-
-type Channel = { id: string; name: string; service: string };
-
-function Trends({ channel }: { channel?: Channel | undefined }) {
-  const runCollect = useServerFn(collectTrends);
-  const runTopics = useServerFn(findTopics);
-  const [niche, setNiche] = useState("");
-  const [feeds, setFeeds] = useState(["", "", ""]);
-  const [items, setItems] = useState<TrendItem[]>([]);
-  const [failed, setFailed] = useState<string[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [busy, setBusy] = useState<"collect" | "topics" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
-
-  async function doCollect(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy("collect"); setError(null); setTopics([]); setItems([]); setFailed([]);
-    try {
-      const r = await runCollect({ data: { niche: niche.trim(), feeds: feeds.map((f) => f.trim()).filter(Boolean) } });
-      setItems(r.items); setFailed(r.failed);
-      if (!r.items.length) setError("No items found. Try a different niche or feed.");
-    } catch { setError("Couldn't collect trends. Check your niche and feed links."); }
-    setBusy(null);
-  }
-  async function doTopics() {
-    setBusy("topics"); setError(null);
-    try {
-      const r = await runTopics({ data: { niche: niche.trim(), items: items.map((i) => ({ title: i.title, link: i.link })) } });
-      if (r.ok) setTopics(r.topics); else setError(r.error);
-    } catch { setError("Couldn't find topics right now. Please try again."); }
-    setBusy(null);
-  }
-
-  return (
-    <section className="mt-8 border-t border-border pt-8">
-      <h2 className="text-sm uppercase tracking-widest text-muted-foreground">Discover trends</h2>
-      <form onSubmit={doCollect} className="mt-3 space-y-3">
-        <input required minLength={2} placeholder="e.g. AI tools for creators" value={niche} onChange={(e) => setNiche(e.target.value)} className={input} aria-label="Your niche" />
-        {feeds.map((f, i) => (
-          <input key={i} type="url" placeholder={`Optional RSS feed URL ${i + 1}`} value={f}
-            onChange={(e) => setFeeds(feeds.map((x, j) => (j === i ? e.target.value : x)))} className={input} aria-label={`RSS feed ${i + 1}`} />
-        ))}
-        <button type="submit" disabled={busy !== null || niche.trim().length < 2} className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
-          {busy === "collect" ? "Collecting trends…" : "Collect trends"}
-        </button>
-      </form>
-      {failed.length > 0 && (
-        <p className="mt-3 text-sm text-muted-foreground">Couldn't load: {failed.join(", ")}</p>
-      )}
-      {items.length > 0 && (
-        <>
-          <ul className="mt-4 max-h-96 divide-y divide-border overflow-y-auto rounded-xl border border-border">
-            {items.map((it) => (
-              <li key={it.link} className="px-4 py-3">
-                <a href={it.link} target="_blank" rel="noreferrer noopener" className="text-sm text-foreground hover:underline">{it.title}</a>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {it.source}{it.date ? ` · ${new Date(it.date).toLocaleDateString()}` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-          <button onClick={doTopics} disabled={busy !== null} className="mt-4 inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
-            {busy === "topics" ? "Finding topics…" : "Find potential topics"}
-          </button>
-        </>
-      )}
-      {topics.length > 0 && (
-        <ol className="mt-4 space-y-3">
-          {topics.map((t, i) => (
-            <li key={i} className="rounded-xl border border-border p-4">
-              <p className="font-display text-lg text-foreground">{i + 1}. {t.topic}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{t.reason}</p>
-              <ul className="mt-2 space-y-1">
-                {t.links.map((l) => (
-                  <li key={l.link}><a href={l.link} target="_blank" rel="noreferrer noopener" className="text-xs text-primary hover:underline">{l.title}</a></li>
-                ))}
-              </ul>
-              <TopicTools niche={niche.trim()} topic={t} channel={channel} />
-            </li>
-          ))}
-        </ol>
-      )}
-      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    </section>
-  );
-}
+import { TemplateLibrary } from "@/components/template-library";
 
 function ReconnectButton() {
   return (
     <a href="/api/public/buffer/start" className="mt-3 inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground">
       Reconnect Buffer
     </a>
-  );
-}
-
-function TopicTools({ niche, topic, channel }: { niche: string; topic: Topic; channel?: Channel | undefined }) {
-  const runIdeas = useServerFn(generateIdeas);
-  const runDraft = useServerFn(createTopicDraft);
-  const runSave = useServerFn(saveBufferDraft);
-  const [ideas, setIdeas] = useState<Idea[]>([]);
-  const [draft, setDraft] = useState("");
-  const [limit, setLimit] = useState(0);
-  const [busy, setBusy] = useState<"ideas" | "draft" | "save" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reconnect, setReconnect] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
-  const payload = { niche, topic: topic.topic, reason: topic.reason, links: topic.links };
-  const btn = "inline-flex h-9 items-center rounded-full border border-border px-4 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50";
-
-  async function doIdeas() {
-    setBusy("ideas"); setError(null);
-    try { const r = await runIdeas({ data: payload }); if (r.ok) setIdeas(r.ideas); else setError(r.error); }
-    catch { setError("Couldn't get content ideas. Please try again."); }
-    setBusy(null);
-  }
-  async function doDraft() {
-    if (!channel) return;
-    setBusy("draft"); setError(null); setSaved(null);
-    try {
-      const r = await runDraft({ data: { ...payload, service: channel.service } });
-      if (r.ok) { setDraft(r.draft); setLimit(r.limit); } else setError(r.error);
-    } catch { setError("Couldn't create a draft. Please try again."); }
-    setBusy(null);
-  }
-  async function doSave() {
-    if (!channel) return;
-    setBusy("save"); setError(null); setSaved(null); setReconnect(false);
-    try {
-      const r = await runSave({ data: { channelId: channel.id, text: draft } });
-      if (r.ok) setSaved(`Saved as a draft in Buffer for ${channel.name}. Nothing was published or scheduled.`);
-      else { setError(r.error); setReconnect(!!r.reconnect); }
-    } catch { setError("Couldn't save the draft. Please try again."); }
-    setBusy(null);
-  }
-  const over = limit > 0 && draft.length > limit;
-
-  return (
-    <div className="mt-3 border-t border-border pt-3">
-      <div className="flex flex-wrap gap-2">
-        <button onClick={doIdeas} disabled={busy !== null} className={btn}>{busy === "ideas" ? "Thinking of ideas…" : "Content ideas"}</button>
-        <button onClick={doDraft} disabled={busy !== null || !channel} className={btn}>
-          {busy === "draft" ? "Writing draft…" : channel ? `Create draft for ${channel.name}` : "Create draft (no channel)"}
-        </button>
-      </div>
-      {ideas.length > 0 && (
-        <ol className="mt-3 list-decimal space-y-2 pl-5">
-          {ideas.map((d, i) => (
-            <li key={i} className="text-sm"><span className="text-foreground">{d.hook}</span><span className="block text-xs text-muted-foreground">{d.angle}</span></li>
-          ))}
-        </ol>
-      )}
-      {draft && (
-        <div className="mt-3 space-y-2">
-          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setSaved(null); }} rows={6}
-            className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground" aria-label="Topic post draft" />
-          <p className={`text-xs ${over ? "text-destructive" : "text-muted-foreground"}`}>{draft.length} / {limit} characters</p>
-          <button onClick={doSave} disabled={busy !== null || !draft.trim() || over || !channel} className={btn}>
-            {busy === "save" ? "Saving…" : "Save as draft in Buffer"}
-          </button>
-        </div>
-      )}
-      {saved && <p className="mt-2 text-sm text-foreground">{saved}</p>}
-      {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
-      {reconnect && <ReconnectButton />}
-    </div>
-  );
-}
-
-function Composer({ channels, channelId, setChannelId }: { channels: Channel[]; channelId: string; setChannelId: (id: string) => void }) {
-  const runImport = useServerFn(importArticle);
-  const runSave = useServerFn(saveBufferDraft);
-  const [url, setUrl] = useState("");
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState<"import" | "save" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reconnect, setReconnect] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const channel = channels.find((c) => c.id === channelId);
-
-  async function doImport(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy("import"); setError(null); setSaved(false);
-    try {
-      const r = await runImport({ data: { url: url.trim(), service: channel?.service ?? "" } });
-      if (r.ok) setDraft(r.draft); else setError(r.error);
-    } catch { setError("Please enter a valid article link."); }
-    setBusy(null);
-  }
-  async function doSave() {
-    setBusy("save"); setError(null); setSaved(false);
-    try {
-      const r = await runSave({ data: { channelId, text: draft } });
-      if (r.ok) setSaved(true); else { setError(r.error); setReconnect(!!r.reconnect); }
-    } catch { setError("Couldn't save the draft. Please try again."); }
-    setBusy(null);
-  }
-
-  const input = "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground";
-  return (
-    <section className="mt-8 border-t border-border pt-8">
-      <h2 className="text-sm uppercase tracking-widest text-muted-foreground">Turn an article into a post</h2>
-      <form onSubmit={doImport} className="mt-3 space-y-3">
-        <input type="url" required placeholder="https://example.com/article" value={url} onChange={(e) => setUrl(e.target.value)} className={input} aria-label="Article URL" />
-        <select value={channelId} onChange={(e) => setChannelId(e.target.value)} className={input} aria-label="Channel">
-          {channels.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.service})</option>)}
-        </select>
-        <button type="submit" disabled={busy !== null || !url} className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
-          {busy === "import" ? "Reading article and writing draft…" : "Import article"}
-        </button>
-      </form>
-      {draft && (
-        <div className="mt-5 space-y-3">
-          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setSaved(false); }} rows={7} className={input} aria-label="Post draft" />
-          <button onClick={doSave} disabled={busy !== null || !draft.trim() || !channelId} className="inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
-            {busy === "save" ? "Saving…" : "Save as draft in Buffer"}
-          </button>
-        </div>
-      )}
-      {saved && <p className="mt-3 text-sm text-foreground">Saved as a draft in Buffer{channel ? ` for ${channel.name}` : ""}.</p>}
-      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-      {reconnect && <ReconnectButton />}
-    </section>
   );
 }
 
@@ -797,23 +578,12 @@ function DraftsView({ onNewPost }: { onNewPost: () => void }) {
   );
 }
 
-function DiscoverView() {
-  const fn = useServerFn(getBufferChannels);
-  const { res } = useLoad((force) => fn({ data: { force } }));
-  const [channelId, setChannelId] = useState("");
-  useEffect(() => {
-    if (res?.status === "ok" && !channelId && res.channels[0]) setChannelId(res.channels[0].id);
-  }, [res, channelId]);
-  const selected = res?.status === "ok" ? res.channels.find((c) => c.id === channelId) : undefined;
+function DiscoverView({ onUse }: { onUse: (text: string) => void }) {
   return (
     <>
       <PageHeader title="Discover" />
-      {!res && <Skeletons n={1} />}
-      {res && res.status !== "ok" && <Problem res={res} />}
-      <StaleBanner res={res} />
-      {res?.status === "ok" && res.channels.length === 0 && <p className="mt-6 text-sm text-muted-foreground">Connect a channel in Buffer to write posts for it.</p>}
-      {res?.status === "ok" && res.channels.length > 0 && <Composer channels={res.channels} channelId={channelId} setChannelId={setChannelId} />}
-      <Trends channel={selected} />
+      <p className="mt-3 text-sm text-muted-foreground">Start from a template. Fill in the blanks, then continue in New post.</p>
+      <TemplateLibrary onUse={onUse} />
     </>
   );
 }
@@ -851,7 +621,7 @@ function AppPage() {
             {view === "drafts" && <DraftsView onNewPost={() => setView("posts")} />}
             {view === "calendar" && <CalendarView Reconnect={() => <ReconnectButton />} onCreate={(when) => { setPrefill({ text: "", when, key: Date.now() }); setView("posts"); }} />}
             {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
-            {view === "discover" && <DiscoverView />}
+            {view === "discover" && <DiscoverView onUse={(text) => { setPrefill({ text, key: Date.now() }); setView("posts"); }} />}
             {view === "photo" && <PhotoStudioView />}
             {view === "settings" && <SettingsView email={email} onSignOut={signOut} />}
           </main>
