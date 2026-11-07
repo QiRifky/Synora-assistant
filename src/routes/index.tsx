@@ -7,6 +7,10 @@ import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
 import { Header } from "@/components/ui/header-1";
+import GlassFolder, { type ArtRecipe } from "@/components/ui/glass-folder-cards";
+
+// Neutral + blue artwork matching the landing palette.
+const FOLDER_ART: ArtRecipe = { style: "streak", colors: ["#f2f2f2", "#cfdcf3", "#0b63f6", "#111111", "#6b7280", "#e5e5e5"], scale: 0.7, warp: 1.5, angle: -0.5, gloss: 0.2, veins: 0 };
 
 const MESSAGES: Record<string, string> = {
   access_denied: "Looks like the Buffer sign-in was cancelled.",
@@ -166,19 +170,21 @@ function Index() {
       <section id="features" className="landing-grey scroll-mt-20 py-16 lg:py-24">
         <div className={CONTAINER}>
           <h2 className="font-display text-3xl text-foreground sm:text-4xl">Everything in one calm place</h2>
-          <div className="feature-grid mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((feature) => (
-              <article
-                key={feature.title}
-                tabIndex={0}
-                className="feature-card flex min-h-56 flex-col justify-between gap-8 rounded-xl border border-border bg-card p-6 text-foreground"
-              >
-                <div className="flex items-start gap-2">
-                  <feature.icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                  <h3 className="text-base font-semibold">{feature.title}</h3>
-                </div>
-                <p className="text-sm text-muted-foreground">{feature.body}</p>
-              </article>
+          <div className="mt-10 grid grid-cols-1 justify-items-center gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map((feature, index) => (
+              <div key={feature.title} className="flex min-w-0 flex-col items-center gap-4 text-center">
+                <GlassFolder
+                  label={feature.title}
+                  meta=""
+                  art={FOLDER_ART}
+                  seed={index * 7 + 3}
+                  files={[{ name: feature.title }]}
+                  action="none"
+                  width={240}
+                  appearDelay={index * 80}
+                />
+                <p className="max-w-60 text-sm text-muted-foreground">{feature.body}</p>
+              </div>
             ))}
           </div>
         </div>
