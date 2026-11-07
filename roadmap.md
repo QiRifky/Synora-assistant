@@ -1,5 +1,6 @@
 # Dashboard sidebar integration
 - [x] Adapt the uploaded sidebar using existing Synora navigation and account actions.
+- [x] Add a Drafts destination to the sidebar that opens Buffer drafts with edit/delete.
 - [x] Verify navigation/sign-out callbacks and routing tests; signed-out desktop/mobile redirects have no overflow.
 - [ ] Verify signed-in desktop collapse and mobile drawer visually; blocked because preview session minting cannot match the requesting account. User must sign in through the preview.
 # Media attachments

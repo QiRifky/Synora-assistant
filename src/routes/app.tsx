@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SidebarNav } from "@/components/ui/dashboard-sidebar";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Radio, FileText, FileEdit, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
 import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
@@ -261,11 +261,12 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-type View = "overview" | "channels" | "posts" | "calendar" | "ideas" | "discover" | "settings";
-const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
+export type View = "overview" | "channels" | "posts" | "drafts" | "calendar" | "ideas" | "discover" | "settings";
+export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "channels", label: "Channels", icon: Radio },
   { id: "posts", label: "Posts", icon: FileText },
+  { id: "drafts", label: "Drafts", icon: FileEdit },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "discover", label: "Discover", icon: Compass },
@@ -495,6 +496,19 @@ function PostsView({ prefill }: { prefill: Prefill | null }) {
   );
 }
 
+function DraftsView({ onNewPost }: { onNewPost: () => void }) {
+  return (
+    <>
+      <PageHeader title="Drafts" />
+      <p className="mt-3 text-sm text-muted-foreground">Drafts saved in Buffer. Edit or delete them here — nothing is published until you decide.</p>
+      <div className="mt-5">
+        <button onClick={onNewPost} className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground">Write a new post</button>
+      </div>
+      <div className="mt-6"><PostList status="draft" version={0} /></div>
+    </>
+  );
+}
+
 function DiscoverView() {
   const fn = useServerFn(getBufferChannels);
   const { res } = useLoad((force) => fn({ data: { force } }));
@@ -543,6 +557,7 @@ function AppPage() {
             {view === "overview" && <OverviewView />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}
+            {view === "drafts" && <DraftsView onNewPost={() => setView("posts")} />}
             {view === "calendar" && <CalendarView Reconnect={() => <ReconnectButton />} onCreate={(when) => { setPrefill({ text: "", when, key: Date.now() }); setView("posts"); }} />}
             {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
             {view === "discover" && <DiscoverView />}
