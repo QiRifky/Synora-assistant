@@ -2,7 +2,9 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSummary, type PostStatus } from "@/lib/buffer.functions";
+import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSummary, type BufferChannel, type BufferPost, type PostStatus } from "@/lib/buffer.functions";
+import { getDashboardData, type DashboardData } from "@/lib/dashboard.functions";
+import { formatBytes } from "@/lib/media-limits";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SidebarNav } from "@/components/ui/dashboard-sidebar";
 import { NewPost, DraftActions, IdeasView, type Prefill } from "@/components/dashboard-posts";
@@ -347,32 +349,257 @@ function useLoad<T>(load: (force: boolean) => Promise<T>, deps: unknown[] = []) 
   return { res, busy, refresh };
 }
 
-function OverviewView() {
-  const fn = useServerFn(getBufferSummary);
-  const { res, busy, refresh } = useLoad((force) => fn({ data: { force } }));
+const OVERVIEW_LOAD_KEY = "synora-overview-load-at";
+const OVERVIEW_COOLDOWN_MS = 10 * 60_000;
+
+type OverviewBuffer =
+  | { state: "idle" }
+  | { state: "error"; reconnect?: boolean; busy?: Busy | undefined }
+  | {
+      state: "ok";
+      at: number;
+      channels: BufferChannel[];
+      counts: Record<PostStatus, { count: number; hasMore: boolean }>;
+      posts: (BufferPost & { status: PostStatus })[];
+      stale?: Busy | undefined;
+    };
+
+function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="text-foreground">{label}</span>
+        <span className="text-muted-foreground">{used} of {limit} used today</span>
+      </div>
+      <div role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit} aria-label={`${label} usage today`} className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function OverviewView({ onOpenPosts }: { onOpenPosts: () => void }) {
+  const dashFn = useServerFn(getDashboardData);
+  const summaryFn = useServerFn(getBufferSummary);
+  const channelsFn = useServerFn(getBufferChannels);
+  const postsFn = useServerFn(getBufferPosts);
+
+  // Synora's own database: loads automatically, never touches the Buffer API.
+  const [dash, setDash] = useState<DashboardData | null>(null);
+  useEffect(() => {
+    let on = true;
+    dashFn().then((r) => { if (on) setDash(r); }).catch(() => { if (on) setDash({ ok: false }); });
+    return () => { on = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Buffer data: loaded only when the user asks, then locked for 10 minutes.
+  const [buffer, setBuffer] = useState<OverviewBuffer>({ state: "idle" });
+  const [loading, setLoading] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(() =>
+    Number(localStorage.getItem(OVERVIEW_LOAD_KEY) ?? 0) + OVERVIEW_COOLDOWN_MS);
+  const [now, setNow] = useState(() => Date.now());
+  const remaining = Math.max(0, cooldownUntil - now);
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [remaining]);
+
+  async function loadFromBuffer() {
+    if (loading || remaining > 0) return;
+    setLoading(true);
+    localStorage.setItem(OVERVIEW_LOAD_KEY, String(Date.now()));
+    setCooldownUntil(Date.now() + OVERVIEW_COOLDOWN_MS);
+    try {
+      const [summary, channels, draft, scheduled, sent] = await Promise.all([
+        summaryFn({ data: { force: true } }),
+        channelsFn({ data: { force: true } }),
+        postsFn({ data: { status: "draft", force: true } }),
+        postsFn({ data: { status: "scheduled", force: true } }),
+        postsFn({ data: { status: "sent", force: true } }),
+      ]);
+      if (summary.status === "reconnect" || channels.status === "reconnect") {
+        setBuffer({ state: "error", reconnect: true });
+      } else if (summary.status !== "ok" || channels.status !== "ok") {
+        setBuffer({ state: "error", busy: ("busy" in summary ? summary.busy : undefined) ?? ("busy" in channels ? channels.busy : undefined) });
+      } else {
+        const posts: (BufferPost & { status: PostStatus })[] = [];
+        for (const [status, r] of [["draft", draft], ["scheduled", scheduled], ["sent", sent]] as const) {
+          if (r.status === "ok") for (const p of r.posts) posts.push({ ...p, status });
+        }
+        const time = (p: BufferPost) => new Date(p.sentAt ?? p.dueAt ?? p.createdAt ?? 0).getTime();
+        posts.sort((a, b) => time(b) - time(a));
+        setBuffer({
+          state: "ok", at: Date.now(), channels: channels.channels, counts: summary.counts, posts,
+          stale: ("stale" in summary ? summary.stale : undefined) ?? ("stale" in channels ? channels.stale : undefined),
+        });
+      }
+    } catch {
+      setBuffer({ state: "error" });
+    }
+    setLoading(false);
+  }
+
+  const mins = Math.floor(remaining / 60_000);
+  const secs = Math.ceil((remaining % 60_000) / 1000);
+  const loadButton = (
+    <button onClick={loadFromBuffer} disabled={loading || remaining > 0}
+      className="mt-4 inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
+      {loading ? "Loading from Buffer…" : remaining > 0 ? `Available again in ${mins}:${String(secs).padStart(2, "0")}` : "Load from Buffer"}
+    </button>
+  );
+
   const fmt = (c: { count: number; hasMore: boolean }) => `${c.count}${c.hasMore ? "+" : ""}`;
+  const perChannel = new Map<string, number>();
+  if (buffer.state === "ok") for (const p of buffer.posts) perChannel.set(p.channelId ?? "", (perChannel.get(p.channelId ?? "") ?? 0) + 1);
+  const statusLabel: Record<PostStatus, string> = { draft: "Draft", scheduled: "Scheduled", sent: "Sent" };
+
   return (
     <>
-      <PageHeader title="Overview" onRefresh={refresh} busy={busy} />
-      {!res && <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-muted" />)}</div>}
-      {res && res.status !== "ok" && <Problem res={res} />}
-      <StaleBanner res={res} />
-      {res?.status === "ok" && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["Channels", String(res.channels)],
-            ["Drafts", fmt(res.counts.draft)],
-            ["Scheduled posts", fmt(res.counts.scheduled)],
-            ["Sent posts", fmt(res.counts.sent)],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
-              <p className="mt-2 font-display text-4xl text-foreground">{value}</p>
+      <PageHeader title="Dashboard" />
+
+      {/* Buffer data — on demand only, to protect Buffer's small API quota. */}
+      <section aria-label="Buffer data" className="mt-6">
+        {buffer.state === "idle" && (
+          <div className="rounded-2xl border border-border bg-card p-6 text-center">
+            <p className="text-sm text-muted-foreground">Your Buffer posts, drafts and channels aren't loaded on this page yet.</p>
+            {loadButton}
+          </div>
+        )}
+        {buffer.state === "error" && (
+          <div className="rounded-2xl border border-border bg-card p-6">
+            {buffer.reconnect ? (
+              <>
+                <p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p>
+                <ReconnectButton />
+              </>
+            ) : buffer.busy ? (
+              <p role="alert" className="text-sm text-destructive">Buffer is busy right now. Please try again in a few minutes.</p>
+            ) : (
+              <p role="alert" className="text-sm text-destructive">Couldn't reach Buffer right now. Please try again in a moment.</p>
+            )}
+            {!buffer.reconnect && loadButton}
+          </div>
+        )}
+        {buffer.state === "ok" && (
+          <>
+            {buffer.stale && <p role="status" className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Buffer is busy, showing saved data.{waitText(buffer.stale)}</p>}
+            <p className="mt-2 text-xs text-muted-foreground">Last updated {new Date(buffer.at).toLocaleTimeString()} · Post counts include up to 50 most recent per status. "+" means there are more.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ["Connected channels", String(buffer.channels.length)],
+                ["Drafts", fmt(buffer.counts.draft)],
+                ["Scheduled posts", fmt(buffer.counts.scheduled)],
+                ["Sent posts", fmt(buffer.counts.sent)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
+                  <p className="mt-2 font-display text-4xl text-foreground">{value}</p>
+                </div>
+              ))}
             </div>
-          ))}
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Connected channels</h2>
+                {buffer.channels.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">No channels connected in Buffer yet.</p>
+                ) : (
+                  <ul className="mt-3 divide-y divide-border">
+                    {buffer.channels.map((c) => (
+                      <li key={c.id} className="flex items-center gap-3 py-2.5">
+                        {c.avatar
+                          ? <img src={c.avatar} alt="" className="h-8 w-8 rounded-full object-cover" loading="lazy" />
+                          : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm text-foreground">{c.name.slice(0, 1).toUpperCase()}</span>}
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{c.name}</span>
+                        <span className="text-xs uppercase tracking-wide text-muted-foreground">{c.service}</span>
+                        <span className="text-xs text-muted-foreground">{perChannel.get(c.id) ?? 0} posts</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Recent posts and drafts</h2>
+                {buffer.posts.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">Nothing here yet. Start with one post.</p>
+                ) : (
+                  <ul className="mt-3 divide-y divide-border">
+                    {buffer.posts.slice(0, 10).map((p) => {
+                      const date = p.sentAt ?? p.dueAt ?? p.createdAt;
+                      return (
+                        <li key={`${p.status}-${p.id}`} className="py-2.5">
+                          <button onClick={onOpenPosts} className="block w-full text-left">
+                            <span className="line-clamp-2 text-sm text-foreground">{p.text || "(no text)"}</span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {statusLabel[p.status]} · {p.channelName}{date ? ` · ${new Date(date).toLocaleDateString()}` : ""}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* Synora's own data — always available, no Buffer calls. */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground">AI usage today</h2>
+          {!dash && <div className="mt-4 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-muted" />)}</div>}
+          {dash && !dash.ok && <p role="alert" className="mt-3 text-sm text-destructive">Couldn't load usage right now.</p>}
+          {dash?.ok && (
+            <div className="mt-4 space-y-4">
+              <UsageBar label="Photo to Post" used={dash.ai.photoToPost.used} limit={dash.ai.photoToPost.limit} />
+              <UsageBar label="Magic Photo" used={dash.ai.magicPhoto.used} limit={dash.ai.magicPhoto.limit} />
+              <div className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="text-foreground">Magic Caption</span>
+                <span className="text-muted-foreground">No daily limit</span>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      {res?.status === "ok" && <p className="mt-4 text-xs text-muted-foreground">Post counts include up to 50 most recent per status. "+" means there are more.</p>}
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Media</h2>
+          {!dash && <div className="mt-4 h-8 animate-pulse rounded-lg bg-muted" />}
+          {dash && !dash.ok && <p role="alert" className="mt-3 text-sm text-destructive">Couldn't load media info right now.</p>}
+          {dash?.ok && (
+            <div className="mt-4 flex gap-8">
+              <div>
+                <p className="font-display text-3xl text-foreground">{dash.media.files}</p>
+                <p className="mt-1 text-xs text-muted-foreground">files linked to saved posts</p>
+              </div>
+              <div>
+                <p className="font-display text-3xl text-foreground">{formatBytes(dash.media.bytes)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">total uploaded</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Recent activity</h2>
+          {!dash && <div className="mt-4 space-y-3">{[0, 1].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-muted" />)}</div>}
+          {dash && !dash.ok && <p role="alert" className="mt-3 text-sm text-destructive">Couldn't load activity right now.</p>}
+          {dash?.ok && dash.activity.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nothing here yet. Start with one post.</p>}
+          {dash?.ok && dash.activity.length > 0 && (
+            <ul className="mt-3 divide-y divide-border">
+              {dash.activity.map((a, i) => (
+                <li key={i} className="py-2.5">
+                  <p className="text-sm text-foreground">{a.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{new Date(a.at).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -554,7 +781,7 @@ function AppPage() {
             <span className="hidden truncate text-[13px] text-muted-foreground md:block">{NAV.find((n) => n.id === view)?.label ?? "Settings"}</span>
           </header>
           <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
-            {view === "overview" && <OverviewView />}
+            {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}
             {view === "drafts" && <DraftsView onNewPost={() => setView("posts")} />}
