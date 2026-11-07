@@ -10,6 +10,7 @@ import { LayoutDashboard, Radio, FileText, Lightbulb, Compass, CalendarDays, Ref
 import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
 import { importArticle, saveBufferDraft } from "@/lib/compose.functions";
+import synoraLogo from "@/assets/synora-logo.png.asset.json";
 
 import { collectTrends, findTopics, generateIdeas, createTopicDraft, type TrendItem, type Topic, type Idea } from "@/lib/trends.functions";
 
@@ -519,7 +520,7 @@ function AppSidebar({ view, setView, email, onSignOut }: { view: View; setView: 
   return (
     <Sidebar>
       <SidebarHeader className="px-4 py-5">
-        <span className="font-display text-2xl text-sidebar-foreground">Synora</span>
+        <img src={synoraLogo.url} alt="Synora" className="h-7 w-auto self-start" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -573,7 +574,7 @@ function AppPage() {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-12 items-center gap-2 border-b border-border px-3 md:hidden">
             <SidebarTrigger />
-            <span className="font-display text-lg text-foreground">Synora</span>
+            <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto" />
           </header>
           <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
             {view === "overview" && <OverviewView />}

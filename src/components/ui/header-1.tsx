@@ -5,6 +5,7 @@ import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
 import { useScroll } from "@/components/ui/use-scroll";
 import { cn } from "@/lib/utils";
 import { waitCountdown } from "@/lib/rate-limit";
+import synoraLogo from "@/assets/synora-logo.png.asset.json";
 
 const links = [
   { label: "How it works", href: "#how-it-works" },
@@ -33,7 +34,7 @@ export function Header({ onSignIn, remaining = 0 }: { onSignIn: () => void; rema
   return (
     <header className={cn("sticky top-0 z-50 w-full border-b border-border bg-background text-foreground", scrolled && "bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/80")}>
       <nav aria-label="Main navigation" className="landing-nav flex h-14 items-center justify-between gap-3">
-        <a href="#top" aria-label="Synora home" className="rounded-md font-display text-2xl text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Synora</a>
+        <a href="#top" aria-label="Synora home" className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><img src={synoraLogo.url} alt="Synora" className="h-7 w-auto" /></a>
         <div className="hidden items-center gap-1 md:flex">
           {links.map(link => <a key={link.label} className={buttonVariants({ variant: "ghost" })} href={link.href}>{link.label}</a>)}
           <div className="ml-3 flex items-center gap-2">
@@ -49,7 +50,7 @@ export function Header({ onSignIn, remaining = 0 }: { onSignIn: () => void; rema
             <Dialog.Overlay className="landing fixed inset-0 z-50 bg-background/95 backdrop-blur-lg" />
             <Dialog.Content aria-describedby={undefined} className="landing fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background text-foreground md:hidden">
               <div className="landing-container flex h-14 shrink-0 items-center justify-between">
-                <Dialog.Title className="font-display text-2xl text-foreground">Synora</Dialog.Title>
+                <Dialog.Title className="font-display text-2xl text-foreground"><img src={synoraLogo.url} alt="Synora" className="h-7 w-auto" /></Dialog.Title>
                 <Dialog.Close asChild><Button size="icon" variant="outline" aria-label="Close menu"><MenuToggleIcon open /></Button></Dialog.Close>
               </div>
               <nav aria-label="Mobile navigation" className="flex flex-1 flex-col gap-3 border-t border-border p-6">

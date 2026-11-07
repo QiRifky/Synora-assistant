@@ -10,6 +10,7 @@ import { deleteMySynoraData, disconnectBuffer, getBufferConnectionStatus, type B
 import { MAGIC_STYLE_KEYS, savePreferences, type Preferences } from "@/lib/settings.functions";
 import { loadPreferences, setCachedPreferences } from "@/lib/preferences-client";
 import { browserTimeZone, listTimeZones } from "@/lib/timezone";
+import synoraLogo from "@/assets/synora-logo.png.asset.json";
 
 const STYLE_LABELS: Record<Preferences["magicStyle"], string> = {
   auto: "Auto", punchier: "Punchier", friendly: "Friendly", professional: "Professional",
@@ -41,7 +42,7 @@ export function SettingsView({ email, onSignOut }: { email: string; onSignOut: (
         <PrivacySection onSignOut={onSignOut} />
         <section className={card}>
           <h2 className={h2}>About</h2>
-          <p className="mt-3 font-display text-2xl text-foreground">Synora</p>
+          <img src={synoraLogo.url} alt="Synora" className="mt-3 h-7 w-auto" />
           <p className="mt-1 text-sm text-muted-foreground">Synora never publishes without your confirmation.</p>
           <p className="mt-3 text-sm"><Link to="/privacy" className="text-primary underline underline-offset-4">Privacy</Link> · <Link to="/terms" className="text-primary underline underline-offset-4">Terms</Link></p>
         </section>
