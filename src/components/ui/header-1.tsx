@@ -32,7 +32,7 @@ export function Header({ onSignIn, remaining = 0 }: { onSignIn: () => void; rema
 
   return (
     <header className={cn("sticky top-0 z-50 w-full border-b border-border bg-background text-foreground", scrolled && "bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/80")}>
-      <nav aria-label="Main navigation" className="landing-container flex h-14 items-center justify-between gap-3">
+      <nav aria-label="Main navigation" className="landing-nav flex h-14 items-center justify-between gap-3">
         <a href="#top" aria-label="Synora home" className="rounded-md font-display text-2xl text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Synora</a>
         <div className="hidden items-center gap-1 md:flex">
           {links.map(link => <a key={link.label} className={buttonVariants({ variant: "ghost" })} href={link.href}>{link.label}</a>)}
