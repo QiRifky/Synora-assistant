@@ -351,6 +351,11 @@ function useLoad<T>(load: (force: boolean) => Promise<T>, deps: unknown[] = []) 
 
 const OVERVIEW_LOAD_KEY = "synora-overview-load-at";
 const OVERVIEW_COOLDOWN_MS = 10 * 60_000;
+const OVERVIEW_AUTO_MS = 30 * 60_000;
+// Per-user keys so accounts on the same browser never share guards.
+const overviewKey = (userId: string, kind: "loaded" | "attempt" | "limited") => `synora-overview-${kind}:${userId}`;
+// Module-level in-flight lock: survives StrictMode double-mounts and fast remounts.
+let overviewInflight: Promise<void> | null = null;
 
 type OverviewBuffer =
   | { state: "idle" }
@@ -378,7 +383,7 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
   );
 }
 
-function OverviewView({ onOpenPosts }: { onOpenPosts: () => void }) {
+function OverviewView({ onOpenPosts, userId }: { onOpenPosts: () => void; userId: string }) {
   const dashFn = useServerFn(getDashboardData);
   const summaryFn = useServerFn(getBufferSummary);
   const channelsFn = useServerFn(getBufferChannels);
@@ -392,58 +397,87 @@ function OverviewView({ onOpenPosts }: { onOpenPosts: () => void }) {
     return () => { on = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Buffer data: loaded only when the user asks, then locked for 10 minutes.
+  // Buffer data: one automatic load after sign-in, otherwise only on demand.
   const [buffer, setBuffer] = useState<OverviewBuffer>({ state: "idle" });
   const [loading, setLoading] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(() =>
     Number(localStorage.getItem(OVERVIEW_LOAD_KEY) ?? 0) + OVERVIEW_COOLDOWN_MS);
+  const [limitedUntil, setLimitedUntil] = useState(() => Number(localStorage.getItem(overviewKey(userId, "limited")) ?? 0));
   const [now, setNow] = useState(() => Date.now());
   const remaining = Math.max(0, cooldownUntil - now);
+  const limitedRemaining = Math.max(0, limitedUntil - now);
   useEffect(() => {
-    if (remaining <= 0) return;
+    if (remaining <= 0 && limitedRemaining <= 0) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [remaining]);
+  }, [remaining, limitedRemaining]);
 
-  async function loadFromBuffer() {
-    if (loading || remaining > 0) return;
-    setLoading(true);
-    localStorage.setItem(OVERVIEW_LOAD_KEY, String(Date.now()));
-    setCooldownUntil(Date.now() + OVERVIEW_COOLDOWN_MS);
-    try {
-      const [summary, channels, draft, scheduled, sent] = await Promise.all([
-        summaryFn({ data: { force: true } }),
-        channelsFn({ data: { force: true } }),
-        postsFn({ data: { status: "draft", force: true } }),
-        postsFn({ data: { status: "scheduled", force: true } }),
-        postsFn({ data: { status: "sent", force: true } }),
-      ]);
-      if (summary.status === "reconnect" || channels.status === "reconnect") {
-        setBuffer({ state: "error", reconnect: true });
-      } else if (summary.status !== "ok" || channels.status !== "ok") {
-        setBuffer({ state: "error", busy: ("busy" in summary ? summary.busy : undefined) ?? ("busy" in channels ? channels.busy : undefined) });
-      } else {
-        const posts: (BufferPost & { status: PostStatus })[] = [];
-        for (const [status, r] of [["draft", draft], ["scheduled", scheduled], ["sent", sent]] as const) {
-          if (r.status === "ok") for (const p of r.posts) posts.push({ ...p, status });
-        }
-        const time = (p: BufferPost) => new Date(p.sentAt ?? p.dueAt ?? p.createdAt ?? 0).getTime();
-        posts.sort((a, b) => time(b) - time(a));
-        setBuffer({
-          state: "ok", at: Date.now(), channels: channels.channels, counts: summary.counts, posts,
-          stale: ("stale" in summary ? summary.stale : undefined) ?? ("stale" in channels ? channels.stale : undefined),
-        });
-      }
-    } catch {
-      setBuffer({ state: "error" });
+  async function loadFromBuffer(manual: boolean) {
+    if (overviewInflight) return overviewInflight;
+    if (manual && remaining > 0) return;
+    if (manual) {
+      localStorage.setItem(OVERVIEW_LOAD_KEY, String(Date.now()));
+      setCooldownUntil(Date.now() + OVERVIEW_COOLDOWN_MS);
     }
-    setLoading(false);
+    setLoading(true);
+    const run = (async () => {
+      try {
+        const [summary, channels, draft, scheduled, sent] = await Promise.all([
+          summaryFn({ data: { force: manual } }),
+          channelsFn({ data: { force: manual } }),
+          postsFn({ data: { status: "draft", force: manual } }),
+          postsFn({ data: { status: "scheduled", force: manual } }),
+          postsFn({ data: { status: "sent", force: manual } }),
+        ]);
+        if (summary.status === "reconnect" || channels.status === "reconnect") {
+          setBuffer({ state: "error", reconnect: true });
+        } else if (summary.status !== "ok" || channels.status !== "ok") {
+          const busy = ("busy" in summary ? summary.busy : undefined) ?? ("busy" in channels ? channels.busy : undefined);
+          setBuffer({ state: "error", busy });
+          if (busy) {
+            const until = Date.now() + (busy.retryAfterMin ?? 5) * 60_000;
+            localStorage.setItem(overviewKey(userId, "limited"), String(until));
+            setLimitedUntil(until);
+          }
+        } else {
+          const posts: (BufferPost & { status: PostStatus })[] = [];
+          for (const [status, r] of [["draft", draft], ["scheduled", scheduled], ["sent", sent]] as const) {
+            if (r.status === "ok") for (const p of r.posts) posts.push({ ...p, status });
+          }
+          const time = (p: BufferPost) => new Date(p.sentAt ?? p.dueAt ?? p.createdAt ?? 0).getTime();
+          posts.sort((a, b) => time(b) - time(a));
+          localStorage.setItem(overviewKey(userId, "loaded"), String(Date.now()));
+          setBuffer({
+            state: "ok", at: Date.now(), channels: channels.channels, counts: summary.counts, posts,
+            stale: ("stale" in summary ? summary.stale : undefined) ?? ("stale" in channels ? channels.stale : undefined),
+          });
+        }
+      } catch {
+        setBuffer({ state: "error" });
+      }
+      setLoading(false);
+    })().finally(() => { overviewInflight = null; });
+    overviewInflight = run;
+    return run;
   }
+
+  // One automatic load per user: skipped when data is fresh (< 30 min), an
+  // auto-load was already attempted, a rate-limit cooldown is active, or a
+  // load is in progress. Never retries, never polls.
+  useEffect(() => {
+    if (document.hidden) return;
+    if (localStorage.getItem(overviewKey(userId, "attempt"))) return;
+    if (Date.now() - Number(localStorage.getItem(overviewKey(userId, "loaded")) ?? 0) < OVERVIEW_AUTO_MS) return;
+    if (Date.now() < Number(localStorage.getItem(overviewKey(userId, "limited")) ?? 0)) return;
+    if (overviewInflight) return;
+    localStorage.setItem(overviewKey(userId, "attempt"), String(Date.now()));
+    void loadFromBuffer(false);
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mins = Math.floor(remaining / 60_000);
   const secs = Math.ceil((remaining % 60_000) / 1000);
   const loadButton = (
-    <button onClick={loadFromBuffer} disabled={loading || remaining > 0}
+    <button onClick={() => void loadFromBuffer(true)} disabled={loading || remaining > 0}
       className="mt-4 inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
       {loading ? "Loading from Buffer…" : remaining > 0 ? `Available again in ${mins}:${String(secs).padStart(2, "0")}` : "Load from Buffer"}
     </button>
@@ -460,9 +494,16 @@ function OverviewView({ onOpenPosts }: { onOpenPosts: () => void }) {
 
       {/* Buffer data — on demand only, to protect Buffer's small API quota. */}
       <section aria-label="Buffer data" className="mt-6">
-        {buffer.state === "idle" && (
+        {buffer.state === "idle" && loading && (
+          <div>
+            <p role="status" className="text-sm text-muted-foreground">Loading your Buffer data…</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-muted" />)}</div>
+          </div>
+        )}
+        {buffer.state === "idle" && !loading && (
           <div className="rounded-2xl border border-border bg-card p-6 text-center">
             <p className="text-sm text-muted-foreground">Your Buffer posts, drafts and channels aren't loaded on this page yet.</p>
+            {limitedRemaining > 0 && <p role="status" className="mt-2 text-sm text-muted-foreground">Buffer is busy right now. Please try again in a few minutes.</p>}
             {loadButton}
           </div>
         )}
@@ -781,7 +822,7 @@ function AppPage() {
             <span className="hidden truncate text-[13px] text-muted-foreground md:block">{NAV.find((n) => n.id === view)?.label ?? "Settings"}</span>
           </header>
           <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
-            {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} />}
+            {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} userId={user.id} />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}
             {view === "drafts" && <DraftsView onNewPost={() => setView("posts")} />}
