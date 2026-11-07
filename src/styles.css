@@ -308,13 +308,8 @@
 .landing .icon-folder-front { border: 1px solid #e5e5e5; }
 .landing .icon-folder-tile { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
 .landing .icon-folder-tag { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }
-/* "and more channels" tile in the folder's small icon row */
-.icon-folder-pill-more { position: relative; }
-.icon-folder-pill-tip {
-  position: absolute; bottom: 100%; right: 0; margin-bottom: 10px;
-  white-space: nowrap; background: var(--card); color: var(--foreground);
-  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
-  font-size: 12px; line-height: 18px; opacity: 0; transition: opacity .2s;
+/* "and more channels" tile at the end of the folder's small icon row */
+.icon-folder-pill > span.icon-folder-pill-more { width: auto; }
+.icon-folder-pill-more .icon-folder-tile {
+  width: auto; padding: 0 8px; font-size: 11px; line-height: 1; white-space: nowrap;
 }
-.icon-folder[data-open="true"] .icon-folder-pill-tip { opacity: 1; }
-.landing .icon-folder-pill-tip { background: var(--landing-white); color: var(--landing-ink); border-color: #e5e5e5; }

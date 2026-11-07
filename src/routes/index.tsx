@@ -106,17 +106,10 @@ const CHANNEL_ICONS: FolderIcon[] = PLATFORMS.map((name) => ({
   node: <svg viewBox="0 0 24 24" aria-hidden="true"><path d={PLATFORM_PATHS[name]} /></svg>,
 }));
 
-// Same tile size and style as the platform marks, standing for everything else.
+// Same tile style as the platform marks, but wide enough to read at a glance.
 const PILL_MORE = (
   <span className="icon-folder-pill-more">
-    <span className="icon-folder-tile">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="5" cy="12" r="2" />
-        <circle cx="12" cy="12" r="2" />
-        <circle cx="19" cy="12" r="2" />
-      </svg>
-    </span>
-    <span className="icon-folder-pill-tip">and more channels</span>
+    <span className="icon-folder-tile">and more channels</span>
   </span>
 );
 
