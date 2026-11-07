@@ -337,3 +337,7 @@
   margin-inline: auto;
   padding-inline: var(--landing-gutter) !important;
 }
+.landing .af-experience .chapter-nav {
+  left: max(var(--landing-gutter), calc((100% - 1200px) / 2 + var(--landing-gutter))) !important;
+  right: max(var(--landing-gutter), calc((100% - 1200px) / 2 + var(--landing-gutter))) !important;
+}
