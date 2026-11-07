@@ -27,7 +27,7 @@ const danger = "inline-flex h-9 items-center rounded-full border border-destruct
 export function SettingsView({ email, onSignOut }: { email: string; onSignOut: () => void }) {
   return (
     <>
-      <h1 className="font-display text-3xl text-foreground">Settings</h1>
+      
       <div className="mt-6 space-y-6">
         <section className={card}>
           <h2 className={h2}>Account</h2>

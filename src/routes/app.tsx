@@ -68,7 +68,7 @@ const NAV_GROUPS: NavGroupData<View>[] = [
 function PageHeader({ title, onRefresh, busy }: { title: string; onRefresh?: () => void; busy?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h1 className="font-display text-3xl text-foreground">{title}</h1>
+      <span className="sr-only">{title}</span>
       {onRefresh && (
         <button onClick={onRefresh} disabled={busy} className="inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm text-foreground hover:bg-muted disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> Refresh
@@ -461,7 +461,7 @@ function ChannelsView() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl text-foreground">Channels</h1>
+        <span />
         <div className="flex flex-wrap gap-2">
           <a href="https://publish.buffer.com/settings/channels" target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm text-primary-foreground hover:opacity-90">
             <ExternalLink className="h-4 w-4" /> Connect a new channel
@@ -588,6 +588,32 @@ function DiscoverView({ onUse }: { onUse: (text: string) => void }) {
   );
 }
 
+const BANNERS: Record<View, { title: string; caption: string }> = {
+  overview: { title: "Dashboard", caption: "Your Buffer channels, posts and Synora activity at a glance." },
+  channels: { title: "Channels", caption: "See the social accounts connected to your Buffer and add new ones." },
+  posts: { title: "Posts", caption: "Write, polish and save posts for your channels. Nothing goes out until you decide." },
+  drafts: { title: "Drafts", caption: "Pick up where you left off. Edit or tidy the drafts saved in Buffer." },
+  calendar: { title: "Calendar", caption: "See what's scheduled and what's already been sent, day by day." },
+  ideas: { title: "Ideas", caption: "Keep every spark in one place, then turn the best ones into posts." },
+  discover: { title: "Discover", caption: "Start from a ready-made template. Fill in the blanks and make it yours." },
+  photo: { title: "Photo Studio", caption: "Upload a photo, get a caption from it, or give it a gentle touch-up." },
+  settings: { title: "Settings", caption: "Manage your account, Buffer connection, preferences and data." },
+};
+
+function PageBanner({ view }: { view: View }) {
+  const b = BANNERS[view];
+  const Icon = NAV.find((n) => n.id === view)?.icon ?? SlidersHorizontal;
+  return (
+    <section className="relative mb-8 overflow-hidden rounded-3xl bg-primary px-6 py-8 text-primary-foreground shadow-soft md:px-10 md:py-10">
+      <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary-foreground/10" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-16 right-24 h-40 w-40 rounded-full bg-primary-foreground/10" />
+      <Icon aria-hidden className="absolute right-8 top-1/2 hidden h-16 w-16 -translate-y-1/2 opacity-30 md:block" />
+      <h1 className="relative font-display text-3xl md:text-4xl">{b.title}</h1>
+      <p className="relative mt-2 max-w-xl text-sm opacity-90 md:text-base">{b.caption}</p>
+    </section>
+  );
+}
+
 function AppPage() {
   const { user } = Route.useRouteContext();
   const navigate = useNavigate();
@@ -610,11 +636,10 @@ function AppPage() {
             <div className="flex min-w-0 items-center gap-3">
               <SidebarTrigger title="Toggle navigation" className="md:hidden" />
               <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto md:hidden" />
-              <span className="hidden truncate text-xs text-muted-foreground md:block">Workspace / {NAV.find((n) => n.id === view)?.label ?? "Settings"}</span>
             </div>
-            <span className="hidden text-xs text-muted-foreground md:block">Write, polish and save — calmly.</span>
           </header>
           <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-9 md:px-10 md:py-12">
+            <PageBanner view={view} />
             {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} userId={user.id} />}
             {view === "channels" && <ChannelsView />}
             {view === "posts" && <PostsView prefill={prefill} />}

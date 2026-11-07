@@ -371,7 +371,7 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-3xl text-foreground">Ideas</h1>
+        <span />
         <button onClick={() => refresh(true)} disabled={loading} className={btn}>{loading ? "Refreshing…" : "Refresh"}</button>
       </div>
       <form onSubmit={add} className="mt-6 space-y-3 rounded-2xl border border-border bg-card p-5">

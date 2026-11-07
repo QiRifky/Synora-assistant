@@ -129,7 +129,7 @@ export function CalendarView({ onCreate, Reconnect }: { onCreate: (when: string)
     <>
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl text-foreground">Calendar</h1>
+          <span />
           <p className="mt-2 text-xs text-muted-foreground">{tz} · <span className="inline-block h-2 w-2 rounded-full bg-primary/60" /> Scheduled · <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/50" /> Sent</p>
         </div>
         <button onClick={() => run(true)} disabled={busy} className={btn}><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> {busy ? "Refreshing…" : "Refresh"}</button>
