@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal, Images, FileText, Send, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BeforeAfter } from "@/components/before-after";
+import { IconFolder, type FolderIcon } from "@/components/ui/icon-folder";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
 
@@ -91,6 +92,11 @@ const PLATFORM_PATHS: Record<string, string> = {
 };
 
 const PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "X", "TikTok", "Pinterest"] as const;
+
+const CHANNEL_ICONS: FolderIcon[] = PLATFORMS.map((name) => ({
+  label: name,
+  node: <svg viewBox="0 0 24 24" aria-hidden="true"><path d={PLATFORM_PATHS[name]} /></svg>,
+}));
 
 const TRUST = [
   { icon: HandMetal, text: "Your original photo is always kept until you choose" },
@@ -211,21 +217,9 @@ function Index() {
             Buffer connects to many social platforms. Connect them in Buffer, and Synora helps you
             write and save posts for them.
           </p>
-          <ul className="mt-10 grid grid-cols-3 gap-6 sm:grid-cols-6 sm:gap-4">
-            {PLATFORMS.map((name) => (
-              <li key={name} className="flex flex-col items-center gap-2">
-                <svg
-                  viewBox="0 0 24 24"
-                  role="img"
-                  aria-label={name}
-                  className="h-8 w-8 fill-primary"
-                >
-                  <path d={PLATFORM_PATHS[name]} />
-                </svg>
-                <span className="text-sm text-foreground">{name}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-12 flex justify-center">
+            <IconFolder title="Your Buffer channels" icons={CHANNEL_ICONS} tags={[...PLATFORMS]} theme="light" spread={58} />
+          </div>
           <p className="mt-8 max-w-xl text-xs text-muted-foreground">
             Available channels depend on your Buffer account and plan. Synora is not affiliated with
             or endorsed by these platforms.

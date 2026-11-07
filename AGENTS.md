@@ -30,6 +30,7 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Project rules
+- Reusable animated folder UI lives in `src/components/ui/icon-folder.tsx`, uses global semantic CSS materials and browser observers only after hydration; landing-page platform data supplies its marks without API calls.
 - Sign-in rate-limit query values are already minutes; preserve sub-minute precision and a per-tab deadline so reloads do not restart the cooldown, while Buffer routes stay unchanged.
 - Buffer OAuth lives in TanStack server routes `/api/public/buffer/{start,callback}` (not Supabase Edge Functions), because this stack runs server code on the app's own worker.
 - Buffer tokens and PKCE state live only in service-role tables (`buffer_connections`, `oauth_states`) with RLS on and no client grants; never return or log them.

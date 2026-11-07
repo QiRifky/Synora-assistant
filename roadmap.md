@@ -1,4 +1,6 @@
 # Media attachments
+# Landing-page channel folder
+- [x] Integrate the reusable folder with existing platform marks and verify interaction, reduced motion and mobile fit without service calls.
 # Magic Photo / Photo to Post
 - [x] Add Photo to Post (vision caption + 3-5 hashtags) and Magic Photo (Clean/Warm/Bright/Calm edits) to New post.
 - [x] Separate daily limits (10 captions, 5 edits) with usage display and friendly limit messages.
