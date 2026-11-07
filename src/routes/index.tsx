@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ImagePlus, Wand2, Save, ShieldCheck, Lock, HandMetal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BeforeAfter } from "@/components/before-after";
 import { useSignInCooldown } from "@/hooks/use-sign-in-cooldown";
 import { rateLimitWaitMessage, waitCountdown } from "@/lib/rate-limit";
 
@@ -12,36 +14,58 @@ const MESSAGES: Record<string, string> = {
 };
 
 const SIGN_IN_CLASS =
-  "inline-flex h-12 items-center rounded-full bg-primary px-8 text-base font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5";
+  "inline-flex h-12 items-center rounded-full bg-primary px-8 text-base font-medium text-primary-foreground shadow-soft motion-safe:transition-transform motion-safe:hover:-translate-y-0.5";
+
+// Example before/after pairs. Add real photo URLs here when available; a
+// missing image shows a clearly labeled placeholder instead.
+const SHOWCASE: { style: string; before: string | null; after: string | null }[] = [
+  { style: "Clean", before: null, after: null },
+  { style: "Warm", before: null, after: null },
+  { style: "Bright", before: null, after: null },
+  { style: "Calm", before: null, after: null },
+];
 
 const STEPS = [
   {
-    title: "Connect your Buffer account",
-    body: "Sign in with Buffer. Synora sees the channels you already have.",
+    icon: ImagePlus,
+    title: "Upload a photo",
+    body: "Add a product or lifestyle photo to a new post.",
   },
   {
-    title: "Paste an article link and pick a channel",
-    body: "Drop in the URL of something you've read, then choose where the post should go.",
+    icon: Wand2,
+    title: "Magic Photo and Photo to Post",
+    body: "Synora improves the photo and writes a caption with hashtags from what is visible in it.",
   },
   {
-    title: "Review the generated post and save it as a draft in Buffer",
-    body: "Read the draft, change the wording, then save it to Buffer as a draft.",
+    icon: Save,
+    title: "Review and save to Buffer",
+    body: "Read everything, change what you like, then save it to Buffer as a draft.",
   },
 ];
 
-const REASONS = [
+const FEATURES = [
   {
-    title: "Your Buffer, your control",
-    body: "Synora only saves drafts. It never publishes or schedules anything on its own.",
+    title: "Magic Photo",
+    body: "Improves light, color and background. It never changes your product, and never adds people, text or logos.",
   },
   {
-    title: "Works with your channels",
-    body: "Synora uses the channels already connected to your Buffer — nothing to set up again.",
+    title: "Photo to Post",
+    body: "Writes the caption and hashtags from what is visible in the photo — no invented facts or claims.",
   },
   {
-    title: "Secure by design",
-    body: "Buffer access stays on the server, never in your browser.",
+    title: "Magic Caption",
+    body: "Polishes your text in your language, keeping your meaning, links and hashtags.",
   },
+  {
+    title: "Publish now",
+    body: "Posts immediately, only when you confirm. Everything else stays a draft until you decide.",
+  },
+];
+
+const TRUST = [
+  { icon: HandMetal, text: "Your original photo is always kept until you choose" },
+  { icon: ShieldCheck, text: "Nothing is posted automatically" },
+  { icon: Lock, text: "Your Buffer access is never shown or shared" },
 ];
 
 export const Route = createFileRoute("/")({
@@ -52,10 +76,10 @@ export const Route = createFileRoute("/")({
   }),
   head: () => ({
     meta: [
-      { title: "Synora — Sign in with Buffer" },
-      { name: "description", content: "Synora brings calm clarity to your Buffer social publishing." },
-      { property: "og:title", content: "Synora" },
-      { property: "og:description", content: "Synora brings calm clarity to your Buffer social publishing." },
+      { title: "Synora: calm social publishing for Buffer" },
+      { name: "description", content: "Synora improves your photo, writes the caption and saves it to Buffer as a draft. Nothing is ever published without your approval." },
+      { property: "og:title", content: "Synora: calm social publishing for Buffer" },
+      { property: "og:description", content: "Make your photos post-ready. Calmly. Synora improves your photo, writes the caption and saves it to Buffer as a draft." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -70,15 +94,13 @@ function Index() {
 
   return (
     <main className="bg-background text-foreground">
-      <div className="mx-auto w-full max-w-3xl px-6">
-        <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-24">
-          <h1 className="font-display text-6xl text-foreground sm:text-7xl">Synora</h1>
-          <p className="mt-5 text-lg text-muted-foreground">
-            Calm clarity for your Buffer social publishing.
-          </p>
-          <p className="mt-4 max-w-md text-base text-muted-foreground">
-            Turn a link you've already read into a short post you can review, then save it to
-            Buffer as a draft.
+      <div className="mx-auto w-full max-w-5xl px-6">
+        <section className="flex flex-col items-center justify-center py-20 text-center sm:min-h-[80vh] sm:py-28">
+          <h1 className="max-w-2xl font-display text-5xl leading-tight text-foreground sm:text-6xl">
+            Make your photos post-ready. Calmly.
+          </h1>
+          <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+            Synora improves your photo, writes the caption and saves it to Buffer as a draft.
           </p>
 
           {error && (
@@ -102,54 +124,85 @@ function Index() {
             Sign in with Buffer
           </Button>
           <p className="mt-4 text-sm text-muted-foreground">
-            Synora saves drafts. It never publishes on its own.
+            Nothing is ever published without your approval.
           </p>
         </section>
 
-        <section className="border-t border-border py-16">
-          <h2 className="font-display text-3xl text-foreground">How it works</h2>
-          <ol className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-3">
+        <section className="border-t border-border py-16 sm:py-20">
+          <h2 className="text-center font-display text-3xl text-foreground sm:text-4xl">See the difference</h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
+            Drag the handle to compare each photo before and after Magic Photo.
+          </p>
+          <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2">
+            {SHOWCASE.map((item) => (
+              <BeforeAfter key={item.style} before={item.before} after={item.after} style={item.style} />
+            ))}
+          </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            Real results from Synora's Magic Photo. Your results may vary.
+          </p>
+        </section>
+
+        <section className="border-t border-border py-16 sm:py-20">
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">How it works</h2>
+          <ol className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3">
             {STEPS.map((step, index) => (
               <li key={step.title}>
-                <span className="font-display text-2xl text-primary">{index + 1}</span>
-                <h3 className="mt-3 text-base font-semibold text-foreground">{step.title}</h3>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-primary">
+                    <step.icon className="h-5 w-5" aria-hidden />
+                  </span>
+                  <span className="font-display text-2xl text-primary">{index + 1}</span>
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-foreground">{step.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
               </li>
             ))}
           </ol>
         </section>
 
-        <section className="border-t border-border py-16">
-          <h2 className="font-display text-3xl text-foreground">Why Synora</h2>
-          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {REASONS.map((reason) => (
+        <section className="border-t border-border py-16 sm:py-20">
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">What Synora does</h2>
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {FEATURES.map((feature) => (
               <div
-                key={reason.title}
+                key={feature.title}
                 className="rounded-2xl border border-border bg-card p-6 shadow-soft"
               >
-                <h3 className="text-base font-semibold text-foreground">{reason.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{reason.body}</p>
+                <h3 className="text-base font-semibold text-foreground">{feature.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{feature.body}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="border-t border-border py-20 text-center">
-          <h2 className="font-display text-3xl text-foreground">
-            Try it with the next article you read
-          </h2>
-          <p className="mt-3 text-base text-muted-foreground">
-            Sign in with Buffer and Synora shows your channels, then waits for your link.
-          </p>
+        <section className="border-t border-border py-16 sm:py-20">
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Calm by default</h2>
+          <ul className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {TRUST.map((point) => (
+              <li key={point.text} className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                  <point.icon className="h-4 w-4" aria-hidden />
+                </span>
+                <p className="text-sm text-foreground">{point.text}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="border-t border-border py-20 text-center sm:py-24">
+          <h2 className="font-display text-3xl text-foreground sm:text-4xl">Ready when you are.</h2>
           <Button disabled={waiting} onClick={startSignIn} className={`${SIGN_IN_CLASS} mt-8`}>
             Sign in with Buffer
           </Button>
         </section>
       </div>
 
-      <footer className="border-t border-border py-6">
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-between gap-3 px-6 text-sm text-muted-foreground sm:flex-row">
-          <span>Synora</span>
+      <footer className="border-t border-border py-8">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
+          <p className="max-w-md text-center text-xs sm:text-left">
+            Synora is an independent app that works with Buffer. Not affiliated with Buffer.
+          </p>
           <div className="flex gap-6">
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link to="/terms" className="hover:text-foreground">Terms</Link>
