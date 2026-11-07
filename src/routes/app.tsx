@@ -755,23 +755,11 @@ function PostList({ status, version }: { status: PostStatus; version: number }) 
 }
 
 function PhotoStudioView() {
-  const tools = [
-    { icon: Hash, title: "Photo to Post", text: "Writes a caption and 3–5 hashtags from your photo. Up to 10 a day." },
-    { icon: Wand2, title: "Magic Photo", text: "Clean, Warm, Bright or Calm edits with a before/after view and Undo. Up to 5 a day." },
-  ];
   return (
     <>
       <PageHeader title="Photo Studio" />
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Add one photo below to unlock both tools. Nothing is published until you decide.</p>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {tools.map((t) => (
-          <div key={t.title} className="flex gap-3 rounded-xl border border-border bg-card p-4">
-            <t.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div><p className="text-sm font-medium text-foreground">{t.title}</p><p className="mt-1 text-xs text-muted-foreground">{t.text}</p></div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-6"><NewPost prefill={null} onDone={() => {}} /></div>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Upload a photo, then write a caption from it or improve it. Nothing is published until you decide.</p>
+      <div className="mt-6"><NewPost studio prefill={null} onDone={() => {}} /></div>
     </>
   );
 }

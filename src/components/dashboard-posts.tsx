@@ -113,7 +113,7 @@ function Outcome({ res, names, success }: { res: WriteResult | null; names?: Map
   );
 }
 
-export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: () => void }) {
+export function NewPost({ prefill, onDone, studio = false }: { prefill: Prefill | null; onDone: () => void; studio?: boolean }) {
   const loadChannels = useServerFn(getBufferChannels);
   const create = useServerFn(createBufferPosts);
   const [channels, setChannels] = useState<ChannelsResult | null>(null);
@@ -193,17 +193,25 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
-      <h2 className="text-sm uppercase tracking-widest text-muted-foreground">New post</h2>
+      {!studio && <h2 className="text-sm uppercase tracking-widest text-muted-foreground">New post</h2>}
       {channels === null && <div className="mt-3 h-24 animate-pulse rounded-xl bg-muted" />}
       {channels?.status === "reconnect" && <Reconnect />}
       {channels?.status === "error" && <p className="mt-3 text-sm text-destructive">Couldn't load your channels. Please refresh.</p>}
       {channels?.status === "ok" && list.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Connect a channel in Buffer first.</p>}
       {channels?.status === "ok" && list.length > 0 && (
         <div className="mt-3 space-y-3">
+          {studio && <>
+            <MediaAttachments studio value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />
+            <PhotoTools studio media={media} setMedia={setMedia} text={text} setText={setText} limit={limit} disabled={!!busy || confirm || confirmPublish || mediaBusy} retainedPaths={retainedPaths} />
+          </>}
+          {(!studio || media.length > 0) && <>
+          {studio && <h3 className="pt-2 text-xs uppercase tracking-widest text-muted-foreground">Your post</h3>}
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} className={input} placeholder="What do you want to share?" aria-label="Post text" />
           <MagicBar text={text} setText={setText} limit={limit} limitNote={tightest ? `limit for ${tightest.name}` : undefined} />
+          {!studio && <>
           <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={!!busy || confirm || confirmPublish} retainedPaths={retainedPaths} channels={chosen.map((c) => ({ service: c.service, name: c.name }))} onViolation={setMediaViolation} />
           <PhotoTools media={media} setMedia={setMedia} text={text} setText={setText} limit={limit} disabled={!!busy || confirm || confirmPublish || mediaBusy} retainedPaths={retainedPaths} />
+          </>}
           <fieldset>
             <legend className="text-xs uppercase tracking-widest text-muted-foreground">Channels</legend>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -231,6 +239,7 @@ export function NewPost({ prefill, onDone }: { prefill: Prefill | null; onDone: 
           </div>
           {when && !dueValid && <p className="text-xs text-destructive">Pick a time at least a minute from now.</p>}
           {ideaId && <p className="text-xs text-muted-foreground">Started from a Buffer idea.</p>}
+          </>}
         </div>
       )}
       <Outcome res={res} names={names} success={successMsg} />

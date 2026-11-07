@@ -69,8 +69,8 @@ async function compressImage(file: File): Promise<{ file: File; note: string | n
   }
 }
 
-export function MediaAttachments({ value, onChange, onBusy, disabled = false, imagesOnly = false, retainedPaths, channels, onViolation }: {
-  value: AttachedMedia[]; onChange: (v: AttachedMedia[]) => void; onBusy: (v: boolean) => void; disabled?: boolean; imagesOnly?: boolean; retainedPaths?: Set<string>;
+export function MediaAttachments({ value, onChange, onBusy, disabled = false, imagesOnly = false, retainedPaths, channels, onViolation, studio = false }: {
+  value: AttachedMedia[]; onChange: (v: AttachedMedia[]) => void; onBusy: (v: boolean) => void; disabled?: boolean; imagesOnly?: boolean; retainedPaths?: Set<string>; studio?: boolean;
   channels?: ChannelInfo[]; onViolation?: (message: string | null) => void;
 }) {
   const checkAvailability = useServerFn(getMediaAvailability);
@@ -176,6 +176,37 @@ export function MediaAttachments({ value, onChange, onBusy, disabled = false, im
   }
 
   const activeMax = value.some((m) => m.type === "video") ? limits.maxVideos : limits.maxImages;
+
+  if (studio) {
+    return <div className="space-y-3">
+      <input ref={picker} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Photo file" disabled={busy || disabled} onChange={(e) => { void add(Array.from(e.target.files ?? []).slice(0, 1)); e.target.value = ""; }} />
+      {value.length === 0 ? (
+        <button type="button" disabled={busy || disabled || available === false}
+          onClick={() => picker.current?.click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); void add(Array.from(e.dataTransfer.files).slice(0, 1)); }}
+          className="flex min-h-[320px] w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-muted/30 px-6 py-12 text-center transition-colors hover:border-primary hover:bg-muted/60 disabled:opacity-60">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary"><ImagePlus className="h-7 w-7" aria-hidden /></span>
+          <span className="text-lg font-medium text-foreground">{busy ? "Uploading your photo…" : "Upload a photo to start"}</span>
+          <span className="max-w-sm text-sm text-muted-foreground">Drag a photo here or click to choose one. JPG, PNG or WebP, up to {formatBytes(limits.imageMaxBytes)}.</span>
+        </button>
+      ) : value.map((m) => <div key={m.path} className="rounded-2xl border border-border p-3">
+        <img src={m.preview} alt={m.file.name} className="mx-auto max-h-[420px] w-full rounded-xl object-contain" />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-xs text-muted-foreground" title={m.file.name}>{m.file.name}{m.note ? ` · ${m.note}` : ""}</p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={busy || disabled} onClick={() => setEditing(m)}><Pencil /> Crop</Button>
+            <Button type="button" variant="outline" size="sm" disabled={busy || disabled} onClick={() => void remove(m)}><X /> Remove photo</Button>
+          </div>
+        </div>
+      </div>)}
+      {progress && <div role="status" className="space-y-1"><p className="break-words text-xs text-muted-foreground">Uploading {progress.name} · {progress.percent}%</p><progress className="h-2 w-full accent-primary" max={100} value={progress.percent} aria-label="Upload progress" /></div>}
+      {available === false && <p role="alert" className="text-xs text-destructive">Photo uploads are unavailable right now.</p>}
+      {violation && <p role="alert" className="text-sm text-destructive">{violation}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {editing && <ImageEditor media={editing} busy={busy || disabled} onClose={() => { if (!busy) setEditing(null); }} onSave={replace} />}
+    </div>;
+  }
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">

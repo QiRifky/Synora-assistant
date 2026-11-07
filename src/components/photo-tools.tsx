@@ -17,7 +17,10 @@ type EditDraft = { path: string; url: string };
 
 // Magic Photo and Photo to Post for the single uploaded image in New post.
 // The image goes to the AI gateway only when the user taps a button.
-export function PhotoTools({ media, setMedia, text, setText, limit, disabled, retainedPaths }: {
+const bigBtn = "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:opacity-50";
+
+export function PhotoTools({ media, setMedia, text, setText, limit, disabled, retainedPaths, studio = false }: {
+  studio?: boolean;
   media: AttachedMedia[];
   setMedia: (v: AttachedMedia[]) => void;
   text: string;
@@ -117,7 +120,34 @@ export function PhotoTools({ media, setMedia, text, setText, limit, disabled, re
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-3">
+    <div className={studio ? "space-y-3" : "space-y-3 rounded-xl border border-border bg-muted/40 p-3"}>
+      {studio ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" aria-hidden /><p className="font-medium text-foreground">Photo to Post</p></div>
+            <p className="text-sm text-muted-foreground">Write a caption and 3–5 hashtags from this photo.</p>
+            <button type="button" className={bigBtn} disabled={disabled || !!busy || captionOut} onClick={() => captionFor(image.path)}>
+              <Sparkles className="h-4 w-4" aria-hidden /> {busy === "caption" ? "Writing…" : "Write caption from photo"}
+            </button>
+            {features && <p className="text-xs text-muted-foreground">{features.captionLeft} of {features.captionLimit} left today</p>}
+          </div>
+          {features?.editAvailable !== false && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-center gap-2"><Wand2 className="h-4 w-4 text-primary" aria-hidden /><p className="font-medium text-foreground">Magic Photo</p></div>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Photo style">
+                {PHOTO_EDIT_STYLES.map(([v, label]) => (
+                  <button key={v} type="button" role="radio" aria-checked={style === v} onClick={() => setStyle(v)}
+                    className={`h-8 rounded-full border px-3 text-xs ${style === v ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"}`}>{label}</button>
+                ))}
+              </div>
+              <button type="button" className={bigBtn} disabled={disabled || !!busy || editOut || !features} onClick={() => editWith(style)}>
+                <Wand2 className="h-4 w-4" aria-hidden /> {busy === "edit" ? "Improving…" : "Improve photo"}
+              </button>
+              {features && <p className="text-xs text-muted-foreground">{features.editLeft} of {features.editLimit} left today</p>}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className={btnSmall} disabled={disabled || !!busy || captionOut} onClick={() => captionFor(image.path)}>
           <Sparkles className="h-3.5 w-3.5" aria-hidden /> {busy === "caption" ? "Writing…" : "Photo to Post"}
@@ -143,6 +173,7 @@ export function PhotoTools({ media, setMedia, text, setText, limit, disabled, re
           </span>
         )}
       </div>
+      )}
       {captionOut && <p className="text-xs text-muted-foreground">You've used all {features?.captionLimit} Photo to Post requests for today. Try again tomorrow.</p>}
       {features?.editAvailable && editOut && <p className="text-xs text-muted-foreground">You've used all {features.editLimit} Magic Photo edits for today. Try again tomorrow.</p>}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
