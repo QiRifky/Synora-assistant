@@ -77,7 +77,7 @@ const FEATURES = [
   },
 ];
 
-// Simple inline SVG marks in one calm green, matching the Synora style.
+// Simple inline SVG marks in one calm slate-blue, matching the Synora style.
 // Logos remain trademarks of their owners; paths via Simple Icons (CC0).
 const PLATFORM_PATHS: Record<string, string> = {
   Instagram:
