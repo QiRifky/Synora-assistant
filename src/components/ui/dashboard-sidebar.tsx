@@ -41,6 +41,18 @@ export function SidebarNav<T extends string>({
     setOpenMobile(false);
   }
 
+  // Play the icon animation when the whole row (the grey area) is hovered, not only the tiny icon.
+  function rowHover(e: React.MouseEvent<HTMLElement>, enter: boolean) {
+    const wrap = e.currentTarget.querySelector<HTMLElement>("[data-nav-icon]");
+    const target = wrap?.firstElementChild as HTMLElement | SVGSVGElement | null;
+    if (!target || e.target === target || target.contains(e.target as Node)) return;
+    if (enter && target instanceof SVGSVGElement) {
+      target.setCurrentTime?.(0);
+      return;
+    }
+    target.dispatchEvent(new MouseEvent(enter ? "mouseover" : "mouseout", { bubbles: true, relatedTarget: e.currentTarget }));
+  }
+
   function item(id: T, title: string, icon: ElementType, badge?: ReactNode, nested = false) {
     const Icon = icon;
     const active = activeId === id;
@@ -51,8 +63,8 @@ export function SidebarNav<T extends string>({
           isActive={active}
           className={`h-8 gap-2 rounded-md px-2 text-[13px] text-foreground transition-colors hover:bg-muted data-[active=true]:bg-muted data-[active=true]:font-medium motion-reduce:transition-none ${nested ? "pl-7" : ""}`}
         >
-          <Button variant="ghost" aria-current={active ? "page" : undefined} onClick={() => select(id)}>
-            <Icon strokeWidth={1.5} className="size-3.5 text-muted-foreground" />
+          <Button variant="ghost" aria-current={active ? "page" : undefined} onClick={() => select(id)} onMouseEnter={(e) => rowHover(e, true)} onMouseLeave={(e) => rowHover(e, false)}>
+            <span data-nav-icon className="inline-flex"><Icon strokeWidth={1.5} className="size-3.5 text-muted-foreground" /></span>
             <span className="flex-1 truncate text-left">{title}</span>
             {badge !== undefined && <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-primary/10 px-1.5 text-[10px] text-primary">{badge}</span>}
           </Button>
@@ -91,9 +103,11 @@ export function SidebarNav<T extends string>({
                   variant="ghost"
                   aria-expanded={open}
                   onClick={() => setClosed((c) => ({ ...c, [key]: open }))}
+                  onMouseEnter={(e) => rowHover(e, true)}
+                  onMouseLeave={(e) => rowHover(e, false)}
                   className="h-8 w-full justify-start gap-2 rounded-md px-2 text-[13px] font-medium text-foreground hover:bg-muted"
                 >
-                  {FolderIcon && <FolderIcon strokeWidth={1.5} className="size-3.5 text-muted-foreground" />}
+                  {FolderIcon && <span data-nav-icon className="inline-flex"><FolderIcon strokeWidth={1.5} className="size-3.5 text-muted-foreground" /></span>}
                   <span className={`flex-1 text-left ${hasActive ? "font-semibold" : ""}`}>{group.heading}</span>
                   <ChevronRight aria-hidden="true" className={`size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`} />
                 </Button>
