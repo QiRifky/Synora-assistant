@@ -1,3 +1,4 @@
+import { DiscoverNavIcon } from "@/components/ui/discover-nav-icon";
 import { PlanShipNavIcon } from "@/components/ui/plan-ship-nav-icon";
 import { IdeasNavIcon } from "@/components/ui/ideas-nav-icon";
 import { PhotoNavIcon } from "@/components/ui/photo-nav-icon";
@@ -59,7 +60,7 @@ export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: "drafts", label: "Drafts", icon: FileEdit },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: IdeasNavIcon as unknown as typeof Lightbulb },
-  { id: "discover", label: "Discover", icon: Compass },
+  { id: "discover", label: "Discover", icon: DiscoverNavIcon as unknown as typeof Compass },
   { id: "photo", label: "Photo Studio", icon: PhotoNavIcon as unknown as typeof ImageIcon },
 ];
 
