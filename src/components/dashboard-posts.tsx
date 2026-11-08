@@ -378,8 +378,8 @@ export function IdeasView({ onUse, savedOnly = false }: { onUse: (text: string, 
         <h2 className="text-sm uppercase tracking-widest text-muted-foreground">New idea</h2>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={input} aria-label="Idea title" maxLength={300} />
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Notes or draft text" className={input} aria-label="Idea text" />
+        <MediaAttachments compact value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={busy} imagesOnly />
         <MagicBar text={text} setText={setText} limit={0} />
-        <MediaAttachments value={media} onChange={setMedia} onBusy={setMediaBusy} disabled={busy} imagesOnly />
         <button type="submit" className={primary} disabled={busy || mediaBusy || (!title.trim() && !text.trim())}>{busy ? "Saving…" : "Save idea"}</button>
         <Outcome res={out} />
       </form>
