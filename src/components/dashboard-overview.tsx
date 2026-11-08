@@ -45,17 +45,18 @@ export function DashboardOverview({ banner, onOpen, userId }: { banner: (refresh
     finally { lock.current = false; setBusy(false); }
   }
   const tip = busy ? "Refreshing from Buffer…" : remaining ? `Refresh from Buffer · Available in ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "Refresh from Buffer";
-  const icon = <TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={remaining || busy || reading ? 0 : undefined} className="absolute right-4 top-4 z-10 inline-flex rounded-full" title={tip}><Button variant="outline" size="icon" aria-label="Refresh from Buffer" disabled={busy || remaining > 0 || reading} onClick={() => void run()} className="rounded-full"><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin motion-reduce:animate-none" : ""}`} /></Button></span></TooltipTrigger><TooltipContent>{tip}</TooltipContent></Tooltip></TooltipProvider>;
+  const icon = <TooltipProvider><Tooltip><TooltipTrigger asChild><span tabIndex={remaining || busy || reading ? 0 : undefined} className="inline-flex rounded-full" title={tip}><Button variant="outline" size="icon" aria-label="Refresh from Buffer" disabled={busy || remaining > 0 || reading} onClick={() => void run()} className="rounded-full"><RefreshCw className={`h-4 w-4 ${busy ? "animate-spin motion-reduce:animate-none" : ""}`} /></Button></span></TooltipTrigger><TooltipContent>{tip}</TooltipContent></Tooltip></TooltipProvider>;
   const snapshot = saved?.snapshot;
   const next = nextScheduledPost(snapshot?.posts ?? [], now);
   const nextChannel = snapshot?.channels.find((c) => c.id === next?.channelId);
   const counts = snapshot ? [String(snapshot.channels.length), ...(["draft", "scheduled", "sent"] as const).map((s) => `${snapshot.counts[s].count}${snapshot.counts[s].hasMore ? "+" : ""}`)] : [];
   return <>
-    {banner(icon)}
+    {banner(null)}
     {saved?.updatedAt && <p className="text-xs text-muted-foreground">Last updated {new Date(saved.updatedAt).toLocaleString()}{snapshotIsStale(saved.updatedAt, now) && <span className="ml-3">Showing saved data</span>}</p>}
     {message && <p role="status" className="mt-3 text-sm text-muted-foreground">{message}</p>}
     {!reading && !snapshot && !message && <p className="mt-3 text-sm text-muted-foreground">No data yet. Tap the refresh icon to load your Buffer data.</p>}
-    <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{["Connected channels", "Drafts", "Scheduled posts", "Sent posts"].map((title, i) => <Card key={title} title={title} loading={reading}><p className="mt-2 font-display text-4xl text-foreground">{counts[i] ?? "—"}</p></Card>)}</div>
+    <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="flex justify-end sm:col-start-2 lg:col-start-4">{icon}</div></div>
+    <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{["Connected channels", "Drafts", "Scheduled posts", "Sent posts"].map((title, i) => <Card key={title} title={title} loading={reading}><p className="mt-2 font-display text-4xl text-foreground">{counts[i] ?? "—"}</p></Card>)}</div>
     {snapshot && <p className="mt-2 text-xs text-muted-foreground">Counts reflect saved posts. “+” means there are more.</p>}
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <Card title="Connected channels" loading={reading}>{!snapshot ? <p className="mt-3 text-sm text-muted-foreground">No saved channels yet.</p> : snapshot.channels.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No channels connected in Buffer yet.</p> : <ul className="mt-3 divide-y divide-border">{snapshot.channels.map((c) => <li key={c.id} className="flex items-center gap-3 py-2.5">{c.avatar ? <img src={c.avatar} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm">{c.name.slice(0,1).toUpperCase()}</span>}<span className="min-w-0 flex-1 truncate text-sm">{c.name}</span><span className="text-xs uppercase text-muted-foreground">{c.service}</span></li>)}</ul>}</Card>
