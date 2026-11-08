@@ -1,4 +1,14 @@
-import { useState, type ElementType, type ReactNode } from "react";
+import { useState, type ElementType, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+
+/** Forward row hover to the animated icon so text and padding trigger it too. */
+function hoverIcon(e: ReactMouseEvent<HTMLElement>, type: "mouseover" | "mouseout") {
+  const icon = e.currentTarget.querySelector<HTMLElement>("[data-nav-icon] > *");
+  icon?.dispatchEvent(new MouseEvent(type, { bubbles: true, relatedTarget: e.currentTarget }));
+}
+const rowHover = {
+  onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => hoverIcon(e, "mouseover"),
+  onMouseLeave: (e: ReactMouseEvent<HTMLElement>) => hoverIcon(e, "mouseout"),
+};
 import { ArrowUpRight, ChevronRight, LogOut, X } from "lucide-react";
 import { SettingsNavIcon } from "@/components/ui/settings-nav-icon";
 import { Button } from "@/components/ui/button";
@@ -51,8 +61,8 @@ export function SidebarNav<T extends string>({
           isActive={active}
           className={`h-8 gap-2 rounded-md px-2 text-[13px] text-foreground transition-colors hover:bg-muted data-[active=true]:bg-muted data-[active=true]:font-medium motion-reduce:transition-none ${nested ? "pl-7" : ""}`}
         >
-          <Button variant="ghost" aria-current={active ? "page" : undefined} onClick={() => select(id)}>
-            <Icon strokeWidth={1.5} className="size-3.5 text-muted-foreground" />
+          <Button variant="ghost" aria-current={active ? "page" : undefined} onClick={() => select(id)} {...rowHover}>
+            <span data-nav-icon className="pointer-events-none inline-flex"><Icon strokeWidth={1.5} className="size-3.5 text-muted-foreground" /></span>
             <span className="flex-1 truncate text-left">{title}</span>
             {badge !== undefined && <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-primary/10 px-1.5 text-[10px] text-primary">{badge}</span>}
           </Button>
@@ -91,9 +101,10 @@ export function SidebarNav<T extends string>({
                   variant="ghost"
                   aria-expanded={open}
                   onClick={() => setClosed((c) => ({ ...c, [key]: open }))}
+                  {...rowHover}
                   className="h-8 w-full justify-start gap-2 rounded-md px-2 text-[13px] font-medium text-foreground hover:bg-muted"
                 >
-                  {FolderIcon && <FolderIcon strokeWidth={1.5} className="size-3.5 text-muted-foreground" />}
+                  {FolderIcon && <span data-nav-icon className="pointer-events-none inline-flex"><FolderIcon strokeWidth={1.5} className="size-3.5 text-muted-foreground" /></span>}
                   <span className={`flex-1 text-left ${hasActive ? "font-semibold" : ""}`}>{group.heading}</span>
                   <ChevronRight aria-hidden="true" className={`size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`} />
                 </Button>
