@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FolderShelf } from "@/components/folder-shelf";
 import { CATEGORIES, TEMPLATES, fillCaption, parseFields, type Template } from "@/lib/templates";
 import { Image as ImageIcon, X } from "lucide-react";
 
@@ -218,6 +219,12 @@ export function TemplateLibrary({ onUse }: { onUse: (text: string) => void }) {
           placeholder="Search templates…"
           aria-label="Search templates"
           className={input}
+        />
+        <FolderShelf
+          groups={CATEGORIES.map((c) => ({ key: c, label: c, items: TEMPLATES.filter((t) => t.category === c).map((t) => t.title) }))}
+          selected={category === "All" ? null : category}
+          onSelect={(k) => setCategory(k ?? "All")}
+          allLabel="All templates"
         />
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
           {["All", ...CATEGORIES].map((c) => (

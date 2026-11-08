@@ -11,6 +11,7 @@ import { magicCaption } from "@/lib/magic.functions";
 import { Sparkles, Undo2 } from "lucide-react";
 import { MediaAttachments, type AttachedMedia } from "@/components/media-attachments";
 import { PhotoTools } from "@/components/photo-tools";
+import { FolderShelf } from "@/components/folder-shelf";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -349,6 +350,7 @@ export function IdeasView({ onUse, savedOnly = false }: { onUse: (text: string, 
   const [out, setOut] = useState<WriteResult | null>(null);
   const [media, setMedia] = useState<AttachedMedia[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [folder, setFolder] = useState<string | null>(null);
 
   function refresh(force: boolean) {
     setLoading(true);
@@ -387,9 +389,15 @@ export function IdeasView({ onUse, savedOnly = false }: { onUse: (text: string, 
       {res?.status === "reconnect" && <div className="mt-6"><p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p><Reconnect /></div>}
       {res?.status === "error" && <p role="alert" className="mt-6 text-sm text-destructive">Couldn't load your ideas from Buffer. Try Refresh in a moment.</p>}
       {res?.status === "ok" && res.ideas.length === 0 && <p className="mt-6 text-sm text-muted-foreground">No ideas in Buffer yet. Add your first one above.</p>}
-      {res?.status === "ok" && res.ideas.length > 0 && (
+      {res?.status === "ok" && res.ideas.length > 0 && (() => {
+        const monthOf = (i: { createdAt: number | null }) => i.createdAt ? new Date(i.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "Undated";
+        const map = new Map<string, string[]>();
+        for (const i of res.ideas) { const k = monthOf(i); map.set(k, [...(map.get(k) ?? []), i.title || i.text]); }
+        const shown = folder ? res.ideas.filter((i) => monthOf(i) === folder) : res.ideas;
+        return (<>
+        <FolderShelf groups={[...map].map(([k, items]) => ({ key: k, label: k, items }))} selected={folder} onSelect={setFolder} allLabel="All ideas" />
         <ul className="mt-6 space-y-3">
-          {res.ideas.map((i) => (
+          {shown.map((i) => (
             <li key={i.id} className="rounded-2xl border border-border bg-card p-4">
               {i.title && <p className="font-display text-lg text-foreground">{i.title}</p>}
               {i.text && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground line-clamp-4">{i.text}</p>}
@@ -397,7 +405,8 @@ export function IdeasView({ onUse, savedOnly = false }: { onUse: (text: string, 
             </li>
           ))}
         </ul>
-      )}
+        </>);
+      })()}
     </>
   );
 }

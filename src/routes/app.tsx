@@ -14,6 +14,7 @@ import { LayoutDashboard, Radio, FileText, FileEdit, Lightbulb, Compass, Calenda
 import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
 import { TemplateLibrary } from "@/components/template-library";
+import { FolderShelf } from "@/components/folder-shelf";
 
 function ReconnectButton() {
   return (
@@ -201,7 +202,8 @@ function ChannelsView() {
   );
 }
 
-function PostList({ status, version, savedOnly = false }: { status: PostStatus; version: number; savedOnly?: boolean }) {
+function PostList({ status, version, savedOnly = false, folders = false }: { status: PostStatus; version: number; savedOnly?: boolean; folders?: boolean }) {
+  const [folder, setFolder] = useState<string | null>(null);
   const fn = useServerFn(getBufferPosts);
   const { res, busy, refresh } = useLoad((force) => fn({ data: { status, force: version > 0, savedOnly: savedOnly && !force && version === 0 } }), [status, version]);
   const label = { draft: "drafts", scheduled: "scheduled posts", sent: "sent posts" }[status];
@@ -217,8 +219,14 @@ function PostList({ status, version, savedOnly = false }: { status: PostStatus; 
       <StaleBanner res={res} />
       {res?.status === "ok" && res.posts.length === 0 && <p className="mt-6 text-sm text-muted-foreground">No {label} in Buffer yet.</p>}
       {res?.status === "ok" && res.posts.length > 0 && (
+        <>
+        {folders && (() => {
+          const map = new Map<string, string[]>();
+          for (const p of res.posts) { const k = p.channelName || p.service; map.set(k, [...(map.get(k) ?? []), p.text || "(no text)"]); }
+          return <FolderShelf groups={[...map].map(([k, items]) => ({ key: k, label: k, items }))} selected={folder} onSelect={setFolder} allLabel="All drafts" />;
+        })()}
         <ul className="mt-4 space-y-3">
-          {res.posts.map((p) => {
+          {res.posts.filter((p) => !folders || !folder || (p.channelName || p.service) === folder).map((p) => {
             const date = status === "sent" ? p.sentAt ?? p.dueAt : status === "scheduled" ? p.dueAt : p.createdAt;
             const prefix = status === "sent" ? "Sent" : status === "scheduled" ? "Scheduled for" : "Created";
             return (
@@ -232,6 +240,7 @@ function PostList({ status, version, savedOnly = false }: { status: PostStatus; 
             );
           })}
         </ul>
+        </>
       )}
       {res?.status === "ok" && res.hasMore && <p className="mt-3 text-xs text-muted-foreground">Showing the 50 most recent.</p>}
     </>
@@ -276,7 +285,7 @@ function DraftsView({ onNewPost }: { onNewPost: () => void }) {
       <div className="mt-5">
         <button onClick={onNewPost} className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground">Write a new post</button>
       </div>
-      <div className="mt-6"><PostList status="draft" version={0} /></div>
+      <div className="mt-6"><PostList status="draft" version={0} folders /></div>
     </>
   );
 }
