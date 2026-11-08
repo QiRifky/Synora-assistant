@@ -1,3 +1,4 @@
+import { OverviewNavIcon } from "@/components/ui/layout-dashboard-icon";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/app")({
 
 export type View = "overview" | "channels" | "posts" | "drafts" | "calendar" | "ideas" | "discover" | "photo" | "settings";
 export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "overview", label: "Overview", icon: OverviewNavIcon as unknown as typeof LayoutDashboard },
   { id: "channels", label: "Channels", icon: Radio },
   { id: "posts", label: "Posts", icon: FileText },
   { id: "drafts", label: "Drafts", icon: FileEdit },
