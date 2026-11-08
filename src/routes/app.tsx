@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutDashboard, Radio, FileText, FileEdit, Lightbulb, Compass, CalendarDays, RefreshCw, ExternalLink } from "lucide-react";
 import { CalendarView } from "@/components/calendar-view";
 import { SettingsView } from "@/components/settings-view";
-import synoraLogo from "@/assets/synora-logo.png.asset.json";
 import { TemplateLibrary } from "@/components/template-library";
 
 function ReconnectButton() {
@@ -635,13 +634,8 @@ function AppPage() {
       <div className="flex min-h-screen w-full bg-background">
         <SidebarNav groups={NAV_GROUPS} activeId={view} onSelect={setView} settingsId="settings" email={email} onSignOut={signOut} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-10">
-            <div className="flex min-w-0 items-center gap-3">
-              <SidebarTrigger title="Toggle navigation" className="md:hidden" />
-              <img src={synoraLogo.url} alt="Synora" className="h-5 w-auto md:hidden" />
-            </div>
-          </header>
-          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-9 md:px-10 md:py-12">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-9 pt-4 md:px-10 md:pb-12 md:pt-6">
+            <SidebarTrigger title="Toggle navigation" className="-ml-2 mb-3 md:hidden" />
             <PageBanner view={view} />
             {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} userId={user.id} />}
             {view === "channels" && <ChannelsView />}
