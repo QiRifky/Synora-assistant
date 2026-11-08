@@ -223,7 +223,7 @@ export function TemplateLibrary({ onUse }: { onUse: (text: string) => void }) {
         />
         {!opened && !query.trim() ? (
         <FolderShelf
-          twoTap
+          openOnClick
           groups={[
             { key: "All", label: "All templates", items: TEMPLATES.map((t) => t.title) },
             ...CATEGORIES.map((c) => ({ key: c, label: c, items: TEMPLATES.filter((t) => t.category === c).map((t) => t.title) })),
