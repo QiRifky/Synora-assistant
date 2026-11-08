@@ -236,17 +236,23 @@ export function TemplateLibrary({ onUse }: { onUse: (text: string) => void }) {
       {filtered.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground">No templates found. Try another word.</p>
       ) : (
-        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        // Hover-reveal grid: hovering one card de-emphasizes the others.
+        <ul className="group mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((t) => (
             <li key={t.id}>
               <button
                 onClick={() => setOpen(t)}
-                className="block w-full rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`${t.title}, ${t.category}`}
+                className="relative block h-72 w-full cursor-pointer overflow-hidden rounded-2xl text-left shadow-md transition-all duration-500 ease-in-out group-hover:scale-[0.98] group-hover:opacity-60 group-hover:blur-[2px] hover:!scale-[1.03] hover:!opacity-100 hover:!blur-none focus-visible:!scale-[1.03] focus-visible:!opacity-100 focus-visible:!blur-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:group-hover:scale-100 motion-reduce:group-hover:opacity-100 motion-reduce:group-hover:blur-none motion-reduce:hover:!scale-100"
               >
-                <TemplateImage template={t} className="aspect-[4/3] w-full rounded-xl" />
-                <p className="mt-3 font-display text-lg text-foreground">{t.title}</p>
-                <p className="mt-0.5 text-xs uppercase tracking-widest text-muted-foreground">{t.category}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+                <TemplateImage template={t} className="absolute inset-0 h-full w-full" />
+                {/* Gradient overlay for text contrast over the image. */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" aria-hidden="true" />
+                <div className="absolute bottom-0 left-0 p-5 text-white">
+                  <p className="text-xs font-light uppercase tracking-widest opacity-80">{t.category}</p>
+                  <p className="mt-1 font-display text-xl font-semibold">{t.title}</p>
+                  <p className="mt-1 text-sm opacity-80">{t.description}</p>
+                </div>
               </button>
             </li>
           ))}
