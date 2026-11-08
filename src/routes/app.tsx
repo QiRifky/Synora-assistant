@@ -1,3 +1,4 @@
+import { PlanShipNavIcon } from "@/components/ui/plan-ship-nav-icon";
 import { IdeasNavIcon } from "@/components/ui/ideas-nav-icon";
 import { PhotoNavIcon } from "@/components/ui/photo-nav-icon";
 import { PostsNavIcon } from "@/components/ui/posts-nav-icon";
@@ -66,7 +67,7 @@ const navItem = (id: View) => { const n = NAV.find((x) => x.id === id)!; return 
 const NAV_GROUPS: NavGroupData<View>[] = [
   { items: [navItem("overview")] },
   { heading: "Create", icon: CreateNavIcon as unknown as typeof Sparkles, items: [navItem("posts"), navItem("photo"), navItem("ideas")] },
-  { heading: "Plan & Ship", icon: CalendarClock, items: [navItem("discover"), navItem("drafts"), navItem("calendar")] },
+  { heading: "Plan & Ship", icon: PlanShipNavIcon as unknown as typeof CalendarClock, items: [navItem("discover"), navItem("drafts"), navItem("calendar")] },
   { heading: "Set up", icon: SlidersHorizontal, items: [navItem("channels")] },
 ];
 
