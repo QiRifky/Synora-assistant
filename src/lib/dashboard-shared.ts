@@ -1,6 +1,6 @@
 import type { BufferChannel, BufferPost, PostStatus } from "@/lib/buffer.functions";
 
-export const DASHBOARD_COOLDOWN_MS = 5 * 60_000;
+export const DASHBOARD_COOLDOWN_MS = 0;
 export const DASHBOARD_STALE_MS = 24 * 60 * 60_000;
 export const DASHBOARD_POST_LIMIT = 50;
 export type DashboardSnapshot = {

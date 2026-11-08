@@ -30,7 +30,7 @@ describe("Dashboard saved-data rules", () => {
     await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
     fireEvent.click(button); fireEvent.click(button); expect(mocks.refresh).toHaveBeenCalledTimes(1);
     await act(async () => finish?.({ ...saved, status: "ok", cooldownUntil: new Date(Date.now() + DASHBOARD_COOLDOWN_MS).toISOString() }));
-    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.hasAttribute("disabled")).toBe(false);
   });
   it("keeps a saved snapshot on 429 and does not automatically retry", async () => {
     mocks.refresh.mockResolvedValue({ ...saved, status: "busy", cooldownUntil: new Date(Date.now()+30_000).toISOString() });
@@ -44,7 +44,7 @@ describe("Dashboard saved-data rules", () => {
     mocks.activity.mockRejectedValue(new Error("unavailable")); mount();
     await screen.findByText("Couldn't load activity right now."); expect(screen.getByText("Nothing scheduled. A quiet week.")).toBeTruthy();
   });
-  it("a refresh cooldown lasts exactly five minutes", () => { expect(DASHBOARD_COOLDOWN_MS).toBe(300_000); });
+  it("refresh has no wait after success", () => { expect(DASHBOARD_COOLDOWN_MS).toBe(0); });
   it("marks saved data stale only after 24 hours", () => {
     const at = "2026-11-08T00:00:00Z"; const now = Date.parse(at);
     expect(snapshotIsStale(at, now + 86_400_000)).toBe(false);

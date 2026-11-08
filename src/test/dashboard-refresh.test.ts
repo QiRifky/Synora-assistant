@@ -33,7 +33,7 @@ describe("Explicit dashboard refresh", () => {
     const limits = [...(state.queries[2] ?? "").matchAll(/first: (\d+)/g)].map((m) => Number(m[1]));
     expect(limits.reduce((a,b) => a+b,0)).toBe(50);
     expect(state.row?.["snapshot"]).toEqual(result.snapshot);
-    const until = Date.parse(result.cooldownUntil ?? ""); expect(until).toBeGreaterThanOrEqual(before + 300_000); expect(until).toBeLessThanOrEqual(Date.now()+300_000);
+    const until = Date.parse(result.cooldownUntil ?? ""); expect(until).toBeGreaterThanOrEqual(before); expect(until).toBeLessThanOrEqual(Date.now());
     expect(state.row?.["lock_until"]).toBeNull();
   });
   it("makes zero requests when another refresh owns the database lock", async () => {
