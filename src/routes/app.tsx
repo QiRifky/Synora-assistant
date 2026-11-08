@@ -2,6 +2,7 @@ import { DiscoverNavIcon } from "@/components/ui/discover-nav-icon";
 import { DraftsNavIcon } from "@/components/ui/drafts-nav-icon";
 import { CalendarNavIcon } from "@/components/ui/calendar-nav-icon";
 import { SetupNavIcon } from "@/components/ui/setup-nav-icon";
+import { ChannelsNavIcon } from "@/components/ui/channels-nav-icon";
 import { PlanShipNavIcon } from "@/components/ui/plan-ship-nav-icon";
 import { IdeasNavIcon } from "@/components/ui/ideas-nav-icon";
 import { PhotoNavIcon } from "@/components/ui/photo-nav-icon";
@@ -58,7 +59,7 @@ export const Route = createFileRoute("/app")({
 export type View = "overview" | "channels" | "posts" | "drafts" | "calendar" | "ideas" | "discover" | "photo" | "settings";
 export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: OverviewNavIcon as unknown as typeof LayoutDashboard },
-  { id: "channels", label: "Channels", icon: Radio },
+  { id: "channels", label: "Channels", icon: ChannelsNavIcon as unknown as typeof Radio },
   { id: "posts", label: "Posts", icon: PostsNavIcon as unknown as typeof FileText },
   { id: "drafts", label: "Drafts", icon: DraftsNavIcon as unknown as typeof FileEdit },
   { id: "calendar", label: "Calendar", icon: CalendarNavIcon as unknown as typeof CalendarDays },
