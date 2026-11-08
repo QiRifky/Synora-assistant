@@ -1,3 +1,4 @@
+import { CreateNavIcon } from "@/components/ui/package-plus-icon";
 import { OverviewNavIcon } from "@/components/ui/layout-dashboard-icon";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,7 +62,7 @@ export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
 const navItem = (id: View) => { const n = NAV.find((x) => x.id === id)!; return { id: n.id, title: n.label, icon: n.icon }; };
 const NAV_GROUPS: NavGroupData<View>[] = [
   { items: [navItem("overview")] },
-  { heading: "Create", icon: Sparkles, items: [navItem("posts"), navItem("photo"), navItem("ideas")] },
+  { heading: "Create", icon: CreateNavIcon as unknown as typeof Sparkles, items: [navItem("posts"), navItem("photo"), navItem("ideas")] },
   { heading: "Plan & Ship", icon: CalendarClock, items: [navItem("discover"), navItem("drafts"), navItem("calendar")] },
   { heading: "Set up", icon: SlidersHorizontal, items: [navItem("channels")] },
 ];
