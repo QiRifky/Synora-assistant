@@ -46,6 +46,12 @@ describe("Dashboard sidebar actions", () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("settings");
   });
 
+  it("shows the animated gear icon on the Settings item", () => {
+    setup();
+    const button = screen.getByRole("button", { name: "Settings" });
+    expect(button.querySelector('path[d^="M21.011"]')).not.toBeNull();
+  });
+
   it("calls the supplied sign-out action once", () => {
     const { onSignOut, onSelect } = setup();
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));

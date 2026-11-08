@@ -1,5 +1,6 @@
 import { useState, type ElementType, type ReactNode } from "react";
-import { ArrowUpRight, ChevronRight, LogOut, Settings, X } from "lucide-react";
+import { ArrowUpRight, ChevronRight, LogOut, X } from "lucide-react";
+import { SettingsNavIcon } from "@/components/ui/settings-nav-icon";
 import { Button } from "@/components/ui/button";
 import { SynoraLogo } from "@/components/synora-logo";
 import {
@@ -115,7 +116,7 @@ export function SidebarNav<T extends string>({
           </div>
         </div>
         <SidebarMenu className="gap-0.5">
-          {item(settingsId, "Settings", Settings)}
+          {item(settingsId, "Settings", SettingsNavIcon)}
         </SidebarMenu>
         <a href="/" className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground">Synora home<ArrowUpRight className="size-3" /></a>
         <SidebarMenu className="gap-0.5">
