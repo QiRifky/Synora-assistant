@@ -1,4 +1,4 @@
-import { useState, type ElementType, type ReactNode } from "react";
+import { useState, type ElementType, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { ArrowUpRight, ChevronRight, LogOut, X } from "lucide-react";
 import { SettingsNavIcon } from "@/components/ui/settings-nav-icon";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ export function SidebarNav<T extends string>({
   }
 
   // Play the icon animation when the whole row (the grey area) is hovered, not only the tiny icon.
-  function rowHover(e: React.MouseEvent<HTMLElement>, enter: boolean) {
+  function rowHover(e: ReactMouseEvent<HTMLElement>, enter: boolean) {
     const wrap = e.currentTarget.querySelector<HTMLElement>("[data-nav-icon]");
     const target = wrap?.firstElementChild as HTMLElement | SVGSVGElement | null;
     if (!target || e.target === target || target.contains(e.target as Node)) return;
