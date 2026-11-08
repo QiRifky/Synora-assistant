@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_snapshots: {
+        Row: {
+          buffer_account_id: string
+          cooldown_until: string | null
+          lock_until: string | null
+          refresh_id: string | null
+          snapshot: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          buffer_account_id: string
+          cooldown_until?: string | null
+          lock_until?: string | null
+          refresh_id?: string | null
+          snapshot?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          buffer_account_id?: string
+          cooldown_until?: string | null
+          lock_until?: string | null
+          refresh_id?: string | null
+          snapshot?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       magic_caption_usage: {
         Row: {
           usage_date: string
@@ -172,6 +202,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_dashboard_refresh: {
+        Args: { p_account_id: string; p_refresh_id: string; p_user_id: string }
+        Returns: boolean
+      }
       claim_unused_media: {
         Args: never
         Returns: {

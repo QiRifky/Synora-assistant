@@ -1,16 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { PHOTO_CAPTION_DAILY_LIMIT, PHOTO_EDIT_DAILY_LIMIT } from "@/lib/photo-shared";
+import type { DashboardSnapshot, SavedDashboard } from "@/lib/dashboard-shared";
 
 export type DashboardData =
   | {
       ok: true;
-      ai: {
-        photoToPost: { used: number; limit: number };
-        magicPhoto: { used: number; limit: number };
-        magicCaption: { unlimited: true };
-      };
-      media: { files: number; bytes: number };
       activity: { at: string; label: string }[];
     }
   | { ok: false };
@@ -25,23 +19,13 @@ export const getDashboardData = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const uid = context.userId;
 
-    const [captionLeft, editLeft, bytes, refs] = await Promise.all([
-      supabaseAdmin.rpc("photo_usage_left", { p_user_id: uid, p_kind: "caption" }),
-      supabaseAdmin.rpc("photo_usage_left", { p_user_id: uid, p_kind: "edit" }),
-      supabaseAdmin.rpc("media_usage_bytes", { p_user_id: uid }),
-      supabaseAdmin
+    const refs = await supabaseAdmin
         .from("media_references")
         .select("created_at, kind")
         .eq("user_id", uid)
         .order("created_at", { ascending: false })
-        .limit(20),
-    ]);
-
-    const left = (v: unknown, limit: number) =>
-      Math.max(0, Math.min(limit, typeof v === "number" ? v : limit));
-
-    const captionL = left(captionLeft.data, PHOTO_CAPTION_DAILY_LIMIT);
-    const editL = left(editLeft.data, PHOTO_EDIT_DAILY_LIMIT);
+        .limit(20);
+    if (refs.error) return { ok: false };
 
     const seen = new Set<string>();
     const activity: { at: string; label: string }[] = [];
@@ -61,15 +45,22 @@ export const getDashboardData = createServerFn({ method: "POST" })
 
     return {
       ok: true,
-      ai: {
-        photoToPost: { used: PHOTO_CAPTION_DAILY_LIMIT - captionL, limit: PHOTO_CAPTION_DAILY_LIMIT },
-        magicPhoto: { used: PHOTO_EDIT_DAILY_LIMIT - editL, limit: PHOTO_EDIT_DAILY_LIMIT },
-        magicCaption: { unlimited: true },
-      },
-      media: {
-        files: refs.data?.length ?? 0,
-        bytes: typeof bytes.data === "number" ? bytes.data : 0,
-      },
       activity,
     };
+  });
+
+/** Reads saved data only; never contacts Buffer or refreshes on mount. */
+export const getDashboardSnapshot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<({ ok: true } & SavedDashboard) | { ok: false }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: conn } = await supabaseAdmin.from("buffer_connections").select("buffer_account_id").eq("user_id", context.userId).maybeSingle();
+    const { data, error } = await context.supabase.from("dashboard_snapshots").select("snapshot, buffer_account_id, updated_at, cooldown_until").eq("user_id", context.userId).maybeSingle();
+    if (error) return { ok: false };
+    if (conn && data && data.buffer_account_id !== conn.buffer_account_id) {
+      const { error: clearError } = await supabaseAdmin.from("dashboard_snapshots").delete().eq("user_id", context.userId).eq("buffer_account_id", data.buffer_account_id);
+      if (clearError) return { ok: false };
+      return { ok: true, snapshot: null, updatedAt: null, cooldownUntil: null };
+    }
+    return { ok: true, snapshot: data?.snapshot as DashboardSnapshot | null ?? null, updatedAt: data?.updated_at ?? null, cooldownUntil: data?.cooldown_until ?? null };
   });

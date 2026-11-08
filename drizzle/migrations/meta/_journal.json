@@ -71,6 +71,13 @@
       "when": 1794031431531,
       "tag": "0009_photo_tools_daily_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794099752575,
+      "tag": "0010_dashboard_saved_snapshots",
+      "breakpoints": true
     }
   ]
 }

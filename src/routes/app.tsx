@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getBufferChannelLimit, getBufferChannels, getBufferPosts, getBufferSummary, type BufferChannel, type BufferPost, type PostStatus } from "@/lib/buffer.functions";
-import { getDashboardData, type DashboardData } from "@/lib/dashboard.functions";
-import { formatBytes } from "@/lib/media-limits";
+import { DashboardOverview } from "@/components/dashboard-overview";
+import type { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SidebarNav, type NavGroupData } from "@/components/ui/dashboard-sidebar";
 import { Sparkles, CalendarClock, SlidersHorizontal, Image as ImageIcon, Wand2, Hash } from "lucide-react";
@@ -139,302 +139,6 @@ function useLoad<T>(load: (force: boolean) => Promise<T>, deps: unknown[] = []) 
   return { res, busy, refresh };
 }
 
-const OVERVIEW_LOAD_KEY = "synora-overview-load-at";
-const OVERVIEW_COOLDOWN_MS = 10 * 60_000;
-const OVERVIEW_AUTO_MS = 30 * 60_000;
-// Per-user keys so accounts on the same browser never share guards.
-const overviewKey = (userId: string, kind: "loaded" | "attempt" | "limited") => `synora-overview-${kind}:${userId}`;
-// Module-level in-flight lock: survives StrictMode double-mounts and fast remounts.
-let overviewInflight: Promise<void> | null = null;
-
-type OverviewBuffer =
-  | { state: "idle" }
-  | { state: "error"; reconnect?: boolean; busy?: Busy | undefined }
-  | {
-      state: "ok";
-      at: number;
-      channels: BufferChannel[];
-      counts: Record<PostStatus, { count: number; hasMore: boolean }>;
-      posts: (BufferPost & { status: PostStatus })[];
-      stale?: Busy | undefined;
-    };
-
-function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="text-foreground">{label}</span>
-        <span className="text-muted-foreground">{used} of {limit} used today</span>
-      </div>
-      <div role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit} aria-label={`${label} usage today`} className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function OverviewView({ onOpenPosts, userId }: { onOpenPosts: () => void; userId: string }) {
-  const dashFn = useServerFn(getDashboardData);
-  const summaryFn = useServerFn(getBufferSummary);
-  const channelsFn = useServerFn(getBufferChannels);
-  const postsFn = useServerFn(getBufferPosts);
-
-  // Synora's own database: loads automatically, never touches the Buffer API.
-  const [dash, setDash] = useState<DashboardData | null>(null);
-  useEffect(() => {
-    let on = true;
-    dashFn().then((r) => { if (on) setDash(r); }).catch(() => { if (on) setDash({ ok: false }); });
-    return () => { on = false; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Buffer data: one automatic load after sign-in, otherwise only on demand.
-  const [buffer, setBuffer] = useState<OverviewBuffer>({ state: "idle" });
-  const [loading, setLoading] = useState(false);
-  const [cooldownUntil, setCooldownUntil] = useState(() =>
-    Number(localStorage.getItem(OVERVIEW_LOAD_KEY) ?? 0) + OVERVIEW_COOLDOWN_MS);
-  const [limitedUntil, setLimitedUntil] = useState(() => Number(localStorage.getItem(overviewKey(userId, "limited")) ?? 0));
-  const [now, setNow] = useState(() => Date.now());
-  const remaining = Math.max(0, cooldownUntil - now);
-  const limitedRemaining = Math.max(0, limitedUntil - now);
-  useEffect(() => {
-    if (remaining <= 0 && limitedRemaining <= 0) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [remaining, limitedRemaining]);
-
-  async function loadFromBuffer(manual: boolean) {
-    if (overviewInflight) return overviewInflight;
-    if (manual && remaining > 0) return;
-    if (manual) {
-      localStorage.setItem(OVERVIEW_LOAD_KEY, String(Date.now()));
-      setCooldownUntil(Date.now() + OVERVIEW_COOLDOWN_MS);
-    }
-    setLoading(true);
-    const run = (async () => {
-      try {
-        const [summary, channels, draft, scheduled, sent] = await Promise.all([
-          summaryFn({ data: { force: manual } }),
-          channelsFn({ data: { force: manual } }),
-          postsFn({ data: { status: "draft", force: manual } }),
-          postsFn({ data: { status: "scheduled", force: manual } }),
-          postsFn({ data: { status: "sent", force: manual } }),
-        ]);
-        if (summary.status === "reconnect" || channels.status === "reconnect") {
-          setBuffer({ state: "error", reconnect: true });
-        } else if (summary.status !== "ok" || channels.status !== "ok") {
-          const busy = ("busy" in summary ? summary.busy : undefined) ?? ("busy" in channels ? channels.busy : undefined);
-          setBuffer({ state: "error", busy });
-          if (busy) {
-            const until = Date.now() + (busy.retryAfterMin ?? 5) * 60_000;
-            localStorage.setItem(overviewKey(userId, "limited"), String(until));
-            setLimitedUntil(until);
-          }
-        } else {
-          const posts: (BufferPost & { status: PostStatus })[] = [];
-          for (const [status, r] of [["draft", draft], ["scheduled", scheduled], ["sent", sent]] as const) {
-            if (r.status === "ok") for (const p of r.posts) posts.push({ ...p, status });
-          }
-          const time = (p: BufferPost) => new Date(p.sentAt ?? p.dueAt ?? p.createdAt ?? 0).getTime();
-          posts.sort((a, b) => time(b) - time(a));
-          localStorage.setItem(overviewKey(userId, "loaded"), String(Date.now()));
-          setBuffer({
-            state: "ok", at: Date.now(), channels: channels.channels, counts: summary.counts, posts,
-            stale: ("stale" in summary ? summary.stale : undefined) ?? ("stale" in channels ? channels.stale : undefined),
-          });
-        }
-      } catch {
-        setBuffer({ state: "error" });
-      }
-      setLoading(false);
-    })().finally(() => { overviewInflight = null; });
-    overviewInflight = run;
-    return run;
-  }
-
-  // One automatic load per user: skipped when data is fresh (< 30 min), an
-  // auto-load was already attempted, a rate-limit cooldown is active, or a
-  // load is in progress. Never retries, never polls.
-  useEffect(() => {
-    if (document.hidden) return;
-    if (localStorage.getItem(overviewKey(userId, "attempt"))) return;
-    if (Date.now() - Number(localStorage.getItem(overviewKey(userId, "loaded")) ?? 0) < OVERVIEW_AUTO_MS) return;
-    if (Date.now() < Number(localStorage.getItem(overviewKey(userId, "limited")) ?? 0)) return;
-    if (overviewInflight) return;
-    localStorage.setItem(overviewKey(userId, "attempt"), String(Date.now()));
-    void loadFromBuffer(false);
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const mins = Math.floor(remaining / 60_000);
-  const secs = Math.ceil((remaining % 60_000) / 1000);
-  const loadButton = (
-    <button onClick={() => void loadFromBuffer(true)} disabled={loading || remaining > 0}
-      className="mt-4 inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50">
-      {loading ? "Loading from Buffer…" : remaining > 0 ? `Available again in ${mins}:${String(secs).padStart(2, "0")}` : "Load from Buffer"}
-    </button>
-  );
-
-  const fmt = (c: { count: number; hasMore: boolean }) => `${c.count}${c.hasMore ? "+" : ""}`;
-  const perChannel = new Map<string, number>();
-  if (buffer.state === "ok") for (const p of buffer.posts) perChannel.set(p.channelId ?? "", (perChannel.get(p.channelId ?? "") ?? 0) + 1);
-  const statusLabel: Record<PostStatus, string> = { draft: "Draft", scheduled: "Scheduled", sent: "Sent" };
-
-  return (
-    <>
-      <PageHeader title="Dashboard" />
-
-      {/* Buffer data — on demand only, to protect Buffer's small API quota. */}
-      <section aria-label="Buffer data" className="mt-6">
-        {buffer.state === "idle" && loading && (
-          <div>
-            <p role="status" className="text-sm text-muted-foreground">Loading your Buffer data…</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-muted" />)}</div>
-          </div>
-        )}
-        {buffer.state === "idle" && !loading && (
-          <div className="rounded-2xl border border-border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">Your Buffer posts, drafts and channels aren't loaded on this page yet.</p>
-            {limitedRemaining > 0 && <p role="status" className="mt-2 text-sm text-muted-foreground">Buffer is busy right now. Please try again in a few minutes.</p>}
-            {loadButton}
-          </div>
-        )}
-        {buffer.state === "error" && (
-          <div className="rounded-2xl border border-border bg-card p-6">
-            {buffer.reconnect ? (
-              <>
-                <p className="text-sm text-muted-foreground">Please sign in with Buffer again.</p>
-                <ReconnectButton />
-              </>
-            ) : buffer.busy ? (
-              <p role="alert" className="text-sm text-destructive">Buffer is busy right now. Please try again in a few minutes.</p>
-            ) : (
-              <p role="alert" className="text-sm text-destructive">Couldn't reach Buffer right now. Please try again in a moment.</p>
-            )}
-            {!buffer.reconnect && loadButton}
-          </div>
-        )}
-        {buffer.state === "ok" && (
-          <>
-            {buffer.stale && <p role="status" className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-foreground">Buffer is busy, showing saved data.{waitText(buffer.stale)}</p>}
-            <p className="mt-2 text-xs text-muted-foreground">Last updated {new Date(buffer.at).toLocaleTimeString()} · Post counts include up to 50 most recent per status. "+" means there are more.</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                ["Connected channels", String(buffer.channels.length)],
-                ["Drafts", fmt(buffer.counts.draft)],
-                ["Scheduled posts", fmt(buffer.counts.scheduled)],
-                ["Sent posts", fmt(buffer.counts.sent)],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
-                  <p className="mt-2 font-display text-4xl text-foreground">{value}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Connected channels</h2>
-                {buffer.channels.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">No channels connected in Buffer yet.</p>
-                ) : (
-                  <ul className="mt-3 divide-y divide-border">
-                    {buffer.channels.map((c) => (
-                      <li key={c.id} className="flex items-center gap-3 py-2.5">
-                        {c.avatar
-                          ? <img src={c.avatar} alt="" className="h-8 w-8 rounded-full object-cover" loading="lazy" />
-                          : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm text-foreground">{c.name.slice(0, 1).toUpperCase()}</span>}
-                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{c.name}</span>
-                        <span className="text-xs uppercase tracking-wide text-muted-foreground">{c.service}</span>
-                        <span className="text-xs text-muted-foreground">{perChannel.get(c.id) ?? 0} posts</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Recent posts and drafts</h2>
-                {buffer.posts.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">Nothing here yet. Start with one post.</p>
-                ) : (
-                  <ul className="mt-3 divide-y divide-border">
-                    {buffer.posts.slice(0, 10).map((p) => {
-                      const date = p.sentAt ?? p.dueAt ?? p.createdAt;
-                      return (
-                        <li key={`${p.status}-${p.id}`} className="py-2.5">
-                          <button onClick={onOpenPosts} className="block w-full text-left">
-                            <span className="line-clamp-2 text-sm text-foreground">{p.text || "(no text)"}</span>
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              {statusLabel[p.status]} · {p.channelName}{date ? ` · ${new Date(date).toLocaleDateString()}` : ""}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Synora's own data — always available, no Buffer calls. */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h2 className="text-xs uppercase tracking-widest text-muted-foreground">AI usage today</h2>
-          {!dash && <div className="mt-4 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-muted" />)}</div>}
-          {dash && !dash.ok && <p role="alert" className="mt-3 text-sm text-destructive">Couldn't load usage right now.</p>}
-          {dash?.ok && (
-            <div className="mt-4 space-y-4">
-              <UsageBar label="Photo to Post" used={dash.ai.photoToPost.used} limit={dash.ai.photoToPost.limit} />
-              <UsageBar label="Magic Photo" used={dash.ai.magicPhoto.used} limit={dash.ai.magicPhoto.limit} />
-              <div className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="text-foreground">Magic Caption</span>
-                <span className="text-muted-foreground">No daily limit</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Media</h2>
-          {!dash && <div className="mt-4 h-8 animate-pulse rounded-lg bg-muted" />}
-          {dash && !dash.ok && <p role="alert" className="mt-3 text-sm text-destructive">Couldn't load media info right now.</p>}
-          {dash?.ok && (
-            <div className="mt-4 flex gap-8">
-              <div>
-                <p className="font-display text-3xl text-foreground">{dash.media.files}</p>
-                <p className="mt-1 text-xs text-muted-foreground">files linked to saved posts</p>
-              </div>
-              <div>
-                <p className="font-display text-3xl text-foreground">{formatBytes(dash.media.bytes)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">total uploaded</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h2 className="text-xs uppercase tracking-widest text-muted-foreground">Recent activity</h2>
-          {!dash && <div className="mt-4 space-y-3">{[0, 1].map((i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-muted" />)}</div>}
-          {dash && !dash.ok && <p role="alert" className="mt-3 text-sm text-destructive">Couldn't load activity right now.</p>}
-          {dash?.ok && dash.activity.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nothing here yet. Start with one post.</p>}
-          {dash?.ok && dash.activity.length > 0 && (
-            <ul className="mt-3 divide-y divide-border">
-              {dash.activity.map((a, i) => (
-                <li key={i} className="py-2.5">
-                  <p className="text-sm text-foreground">{a.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{new Date(a.at).toLocaleString()}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
 function ChannelsView() {
   const fn = useServerFn(getBufferChannels);
   const limitFn = useServerFn(getBufferChannelLimit);
@@ -497,9 +201,9 @@ function ChannelsView() {
   );
 }
 
-function PostList({ status, version }: { status: PostStatus; version: number }) {
+function PostList({ status, version, savedOnly = false }: { status: PostStatus; version: number; savedOnly?: boolean }) {
   const fn = useServerFn(getBufferPosts);
-  const { res, busy, refresh } = useLoad((force) => fn({ data: { status, force: version > 0 } }), [status, version]);
+  const { res, busy, refresh } = useLoad((force) => fn({ data: { status, force: version > 0, savedOnly: savedOnly && !force && version === 0 } }), [status, version]);
   const label = { draft: "drafts", scheduled: "scheduled posts", sent: "sent posts" }[status];
   return (
     <>
@@ -534,31 +238,31 @@ function PostList({ status, version }: { status: PostStatus; version: number }) 
   );
 }
 
-function PhotoStudioView() {
+function PhotoStudioView({ savedOnly = false }: { savedOnly?: boolean }) {
   return (
     <>
       <PageHeader title="Photo Studio" />
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Upload a photo, then write a caption from it or improve it. Nothing is published until you decide.</p>
-      <div className="mt-6"><NewPost studio prefill={null} onDone={() => {}} /></div>
+      <div className="mt-6"><NewPost studio savedOnly={savedOnly} prefill={null} onDone={() => {}} /></div>
     </>
   );
 }
 
-function PostsView({ prefill }: { prefill: Prefill | null }) {
+function PostsView({ prefill, savedOnly = false }: { prefill: Prefill | null; savedOnly?: boolean }) {
   const [version, setVersion] = useState(0);
   return (
     <>
       <PageHeader title="Posts" />
-      <div className="mt-6"><NewPost prefill={prefill} onDone={() => setVersion((v) => v + 1)} /></div>
+      <div className="mt-6"><NewPost savedOnly={savedOnly} prefill={prefill} onDone={() => setVersion((v) => v + 1)} /></div>
       <Tabs defaultValue="draft" className="mt-8">
         <TabsList>
           <TabsTrigger value="draft">Drafts</TabsTrigger>
           <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
           <TabsTrigger value="sent">Sent</TabsTrigger>
         </TabsList>
-        <TabsContent value="draft"><PostList status="draft" version={version} /></TabsContent>
-        <TabsContent value="scheduled"><PostList status="scheduled" version={version} /></TabsContent>
-        <TabsContent value="sent"><PostList status="sent" version={version} /></TabsContent>
+        <TabsContent value="draft"><PostList savedOnly={savedOnly} status="draft" version={version} /></TabsContent>
+        <TabsContent value="scheduled"><PostList savedOnly={savedOnly} status="scheduled" version={version} /></TabsContent>
+        <TabsContent value="sent"><PostList savedOnly={savedOnly} status="sent" version={version} /></TabsContent>
       </Tabs>
     </>
   );
@@ -601,13 +305,14 @@ const BANNERS: Record<View, { title: string; caption: string }> = {
 
 const BANNER_IMAGES = import.meta.glob("../assets/banners/*.jpg", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 
-function PageBanner({ view }: { view: View }) {
+function PageBanner({ view, action }: { view: View; action?: ReactNode }) {
   const b = BANNERS[view];
   const img = BANNER_IMAGES[`../assets/banners/${view}.jpg`];
   return (
     <section className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-muted shadow-soft">
       {img && <img src={img} alt="" width={1536} height={512} className="absolute inset-0 h-full w-full object-cover object-right" />}
       <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
+      {action}
       <div className="relative px-6 py-10 md:px-10 md:py-14">
         <h1 className="font-display text-3xl text-foreground md:text-4xl">{b.title}</h1>
         <p className="mt-2 max-w-md text-sm text-muted-foreground md:text-base">{b.caption}</p>
@@ -622,6 +327,7 @@ function AppPage() {
   const meta = (user.user_metadata ?? {}) as { buffer_email?: string | null; name?: string };
   const email = meta.buffer_email || "no email provided";
   const [view, setView] = useState<View>("overview");
+  const [savedOnly, setSavedOnly] = useState(false);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
 
   async function signOut() {
@@ -632,19 +338,19 @@ function AppPage() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
-        <SidebarNav groups={NAV_GROUPS} activeId={view} onSelect={setView} settingsId="settings" email={email} onSignOut={signOut} />
+        <SidebarNav groups={NAV_GROUPS} activeId={view} onSelect={(v) => { setSavedOnly(false); setView(v); }} settingsId="settings" email={email} onSignOut={signOut} />
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-9 pt-4 md:px-10 md:pb-12 md:pt-6">
             <SidebarTrigger title="Toggle navigation" className="-ml-2 mb-3 md:hidden" />
-            <PageBanner view={view} />
-            {view === "overview" && <OverviewView onOpenPosts={() => setView("posts")} userId={user.id} />}
+            {view !== "overview" && <PageBanner view={view} />}
+            {view === "overview" && <DashboardOverview banner={(action) => <PageBanner view="overview" action={action} />} onOpen={(v) => { setSavedOnly(v !== "calendar"); setView(v); }} userId={user.id} />}
             {view === "channels" && <ChannelsView />}
-            {view === "posts" && <PostsView prefill={prefill} />}
+            {view === "posts" && <PostsView prefill={prefill} savedOnly={savedOnly} />}
             {view === "drafts" && <DraftsView onNewPost={() => setView("posts")} />}
             {view === "calendar" && <CalendarView Reconnect={() => <ReconnectButton />} onCreate={(when) => { setPrefill({ text: "", when, key: Date.now() }); setView("posts"); }} />}
-            {view === "ideas" && <IdeasView onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
+            {view === "ideas" && <IdeasView savedOnly={savedOnly} onUse={(text, ideaId) => { setPrefill({ text, ideaId, key: Date.now() }); setView("posts"); }} />}
             {view === "discover" && <DiscoverView onUse={(text) => { setPrefill({ text, key: Date.now() }); setView("posts"); }} />}
-            {view === "photo" && <PhotoStudioView />}
+            {view === "photo" && <PhotoStudioView savedOnly={savedOnly} />}
             {view === "settings" && <SettingsView email={email} onSignOut={signOut} />}
           </main>
           <footer className="mx-5 mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border py-6 text-xs text-muted-foreground md:mx-10">

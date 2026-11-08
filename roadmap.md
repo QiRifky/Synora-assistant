@@ -1,4 +1,6 @@
 # Dashboard sidebar integration
+- [x] Replace Dashboard automatic Buffer loading with a durable owner-only snapshot and explicit locked refresh; verify snapshot/cooldown/request rules with tests.
+- [ ] Verify Dashboard snapshot/refresh visually on signed-in desktop/mobile; blocked because preview cannot mint a session for the requesting account.
 - [x] Adapt the uploaded sidebar using existing Synora navigation and account actions.
 - [x] Add a Drafts destination to the sidebar that opens Buffer drafts with edit/delete.
 - [x] Verify navigation/sign-out callbacks and routing tests; signed-out desktop/mobile redirects have no overflow.

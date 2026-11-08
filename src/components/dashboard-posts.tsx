@@ -113,7 +113,7 @@ function Outcome({ res, names, success }: { res: WriteResult | null; names?: Map
   );
 }
 
-export function NewPost({ prefill, onDone, studio = false }: { prefill: Prefill | null; onDone: () => void; studio?: boolean }) {
+export function NewPost({ prefill, onDone, studio = false, savedOnly = false }: { prefill: Prefill | null; onDone: () => void; studio?: boolean; savedOnly?: boolean }) {
   const loadChannels = useServerFn(getBufferChannels);
   const create = useServerFn(createBufferPosts);
   const [channels, setChannels] = useState<ChannelsResult | null>(null);
@@ -135,7 +135,7 @@ export function NewPost({ prefill, onDone, studio = false }: { prefill: Prefill 
   const [tz, setTz] = useState(browserTimeZone);
   useEffect(() => {
     let live = true;
-    Promise.all([loadChannels({ data: {} }), loadPreferences()]).then(([ch, prefs]) => {
+    Promise.all([loadChannels({ data: { savedOnly } }), loadPreferences()]).then(([ch, prefs]) => {
       if (!live) return;
       setChannels(ch);
       if (prefs?.timeZone && isValidTimeZone(prefs.timeZone)) setTz(prefs.timeZone);
@@ -144,7 +144,7 @@ export function NewPost({ prefill, onDone, studio = false }: { prefill: Prefill 
       }
     }).catch(() => { if (live) setChannels({ status: "error" }); });
     return () => { live = false; };
-  }, [loadChannels]);
+  }, [loadChannels, savedOnly]);
   useEffect(() => {
     if (!prefill) return;
     if (prefill.when) setWhen(prefill.when);
@@ -338,7 +338,7 @@ export function DraftActions({ id, text, onChanged }: { id: string; text: string
   );
 }
 
-export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => void }) {
+export function IdeasView({ onUse, savedOnly = false }: { onUse: (text: string, ideaId: string) => void; savedOnly?: boolean }) {
   const load = useServerFn(getBufferIdeas);
   const create = useServerFn(createBufferIdea);
   const [res, setRes] = useState<IdeasResult | null>(null);
@@ -352,7 +352,7 @@ export function IdeasView({ onUse }: { onUse: (text: string, ideaId: string) => 
 
   function refresh(force: boolean) {
     setLoading(true);
-    load({ data: { force } }).then(setRes).catch(() => setRes({ status: "error" })).finally(() => setLoading(false));
+    load({ data: { force, savedOnly: savedOnly && !force } }).then(setRes).catch(() => setRes({ status: "error" })).finally(() => setLoading(false));
   }
   useEffect(() => { refresh(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

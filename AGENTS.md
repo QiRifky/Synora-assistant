@@ -30,6 +30,7 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Project rules
+- Dashboard reads durable owner-only snapshots on entry and refreshes only on explicit banner action; a database lease/cooldown prevents duplicate calls across workers, and shortcut entry reads saved data to avoid Buffer requests.
 - Dashboard navigation uses the configurable `src/components/ui/dashboard-sidebar.tsx` with existing shadcn sidebar state and real app destinations; omit template-only workspaces and mock features to preserve Synora behavior.
 - Landing navigation uses the reusable Header with existing section anchors and the page's shared sign-in cooldown; the mobile dialog provides focus trapping and scroll locking without service calls.
 - Reusable animated folder UI lives in `src/components/ui/icon-folder.tsx`, uses global semantic CSS materials and browser observers only after hydration; landing-page platform data supplies its marks without API calls.

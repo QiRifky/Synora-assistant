@@ -5,6 +5,7 @@ import { charLimit } from "@/lib/trends.functions";
 import { mediaInput, ownsMedia, postAssets, MAX_MEDIA_BYTES, MEDIA_BUCKET, type MediaAttachment } from "@/lib/media";
 import { checkMediaAgainstLimits, effectiveMediaLimits, formatBytes, type EffectiveMediaLimits } from "@/lib/media-limits";
 import { retryAfterMinutes } from "@/lib/rate-limit";
+import { DASHBOARD_COOLDOWN_MS, dashboardPostBudgets, type DashboardRefreshResult, type DashboardSnapshot } from "@/lib/dashboard-shared";
 
 /** Set when Buffer rate-limited us; minutes until retry when Buffer said so. */
 export type Busy = { retryAfterMin: number | null };
@@ -172,8 +173,8 @@ function loadChannels(userId: string, force: boolean): Promise<ChannelsResult> {
 type AllPosts = ({ status: "ok"; byStatus: Record<PostStatus, { posts: BufferPost[]; hasMore: boolean }> } & Stale) | { status: "reconnect" } | Err;
 
 /** Drafts, scheduled and sent posts for every organization in one request. */
-function loadAllPosts(userId: string, force: boolean): Promise<AllPosts> {
-  return cached(`${userId}:posts`, force, () => guard(async () => {
+function loadAllPosts(userId: string, force: boolean, dashboard = false): Promise<AllPosts> {
+  return cached(`${userId}:${dashboard ? "dashboard-posts" : "posts"}`, force, () => guard(async () => {
     const ch = await loadChannels(userId, false);
     const names = new Map(ch.status === "ok" ? ch.channels.map((c) => [c.id, c.name]) : []);
     const orgs = await orgIdsFor(userId);
@@ -183,13 +184,17 @@ function loadAllPosts(userId: string, force: boolean): Promise<AllPosts> {
       const parts: string[] = [];
       const vars: Record<string, unknown> = { first: PAGE };
       const decl: string[] = ["$first: Int"];
+      const budgets = dashboardPostBudgets(orgs.length);
       orgs.forEach((org, i) => STATUSES.forEach((s) => {
         const sort = s === "scheduled" ? [{ field: "dueAt", direction: "asc" }] : [{ field: s === "sent" ? "dueAt" : "createdAt", direction: "desc" }];
         const k = `${s}${i}`;
+        const budget = budgets[i * 3 + STATUSES.indexOf(s)] ?? 0;
+        if (dashboard && budget === 0) { byStatus[s].hasMore = true; return; }
         decl.push(`$${k}: PostsInput!`);
         vars[k] = { organizationId: org, filter: { status: [s] }, sort };
-        parts.push(`${k}: posts(input: $${k}, first: $first) { edges { node { id text channelId channelService dueAt sentAt createdAt assets { thumbnail type } } } pageInfo { hasNextPage } }`);
+        parts.push(`${k}: posts(input: $${k}, first: ${dashboard ? budget : "$first"}) { edges { node { id text channelId channelService dueAt sentAt createdAt assets { thumbnail type } } } pageInfo { hasNextPage } }`);
       }));
+      if (dashboard) { decl.shift(); delete vars["first"]; }
       const d = await gql(token, `query(${decl.join(", ")}) { ${parts.join("\n")} }`, vars);
       orgs.forEach((_, i) => STATUSES.forEach((s) => {
         const conn = d?.[`${s}${i}`];
@@ -215,18 +220,30 @@ async function loadPosts(userId: string, status: PostStatus, force: boolean): Pr
   return { status: "ok", ...r.byStatus[status], ...(r.stale ? { stale: r.stale } : {}) };
 }
 
-const forceInput = (d: unknown) => z.object({ force: z.boolean().optional() }).optional().parse(d);
+const forceInput = (d: unknown) => z.object({ force: z.boolean().optional(), savedOnly: z.boolean().optional() }).optional().parse(d);
+
+async function savedSnapshotFor(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.from("dashboard_snapshots").select("snapshot").eq("user_id", userId).maybeSingle();
+  return data?.snapshot as DashboardSnapshot | null;
+}
 
 // Never log or return tokens.
 export const getBufferChannels = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(forceInput)
-  .handler(({ data, context }) => loadChannels(context.userId, !!data?.force));
+  .handler(async ({ data, context }): Promise<ChannelsResult> => data?.savedOnly
+    ? { status: "ok", channels: (await savedSnapshotFor(context.userId))?.channels ?? [] }
+    : loadChannels(context.userId, !!data?.force));
 
 export const getBufferPosts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ status: z.enum(["draft", "scheduled", "sent"]), force: z.boolean().optional() }).parse(d))
-  .handler(({ data, context }) => loadPosts(context.userId, data.status, !!data.force));
+  .inputValidator((d) => z.object({ status: z.enum(["draft", "scheduled", "sent"]), force: z.boolean().optional(), savedOnly: z.boolean().optional() }).parse(d))
+  .handler(async ({ data, context }): Promise<PostsResult> => {
+    if (!data.savedOnly) return loadPosts(context.userId, data.status, !!data.force);
+    const snapshot = await savedSnapshotFor(context.userId);
+    return { status: "ok", posts: snapshot?.posts.filter((p) => p.status === data.status) ?? [], hasMore: snapshot?.counts[data.status].hasMore ?? false };
+  });
 
 export const getBufferSummary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -241,6 +258,49 @@ export const getBufferSummary = createServerFn({ method: "POST" })
     const counts = Object.fromEntries(STATUSES.map((s) => [s, { count: all.byStatus[s].posts.length, hasMore: all.byStatus[s].hasMore }])) as Record<PostStatus, { count: number; hasMore: boolean }>;
     const stale = ch.stale ?? all.stale;
     return { status: "ok", channels: ch.channels.length, counts, ...(stale ? { stale } : {}) };
+  });
+
+/** Only the Dashboard's explicit refresh calls this; DB lock protects all tabs/workers. */
+export const refreshDashboardSnapshot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<DashboardRefreshResult> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const uid = context.userId;
+    const read = async () => {
+      const { data, error } = await supabaseAdmin.from("dashboard_snapshots").select("snapshot, updated_at, cooldown_until").eq("user_id", uid).maybeSingle();
+      if (error) throw new Failed();
+      return { snapshot: data?.snapshot as DashboardSnapshot | null ?? null, updatedAt: data?.updated_at ?? null, cooldownUntil: data?.cooldown_until ?? null };
+    };
+    const { data: conn } = await supabaseAdmin.from("buffer_connections").select("buffer_account_id").eq("user_id", uid).maybeSingle();
+    if (!conn) return { ...await read(), status: "reconnect" };
+    const refreshId = crypto.randomUUID();
+    const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_dashboard_refresh", { p_user_id: uid, p_account_id: conn.buffer_account_id, p_refresh_id: refreshId });
+    if (!claimed || claimError) return { ...await read(), status: claimError ? "error" : "cooldown" };
+    let status: DashboardRefreshResult["status"] = "error";
+    try {
+      const orgs = await loadOrgs(uid, false);
+      if (orgs.status !== "ok") { if (orgs.status === "reconnect") throw new Reconnect(); if (orgs.busy) throw new RateLimited(orgs.busy.retryAfterMin); throw new Failed(); }
+      if (orgs.stale) throw new RateLimited(orgs.stale.retryAfterMin);
+      const channels = await loadChannels(uid, false);
+      if (channels.status !== "ok") { if (channels.status === "reconnect") throw new Reconnect(); if (channels.busy) throw new RateLimited(channels.busy.retryAfterMin); throw new Failed(); }
+      if (channels.stale) throw new RateLimited(channels.stale.retryAfterMin);
+      const all = await loadAllPosts(uid, false, true);
+      if (all.status !== "ok") { if (all.status === "reconnect") throw new Reconnect(); if (all.busy) throw new RateLimited(all.busy.retryAfterMin); throw new Failed(); }
+      if (all.stale) throw new RateLimited(all.stale.retryAfterMin);
+      const snapshot: DashboardSnapshot = {
+        channels: channels.channels,
+        counts: Object.fromEntries(STATUSES.map((s) => [s, { count: all.byStatus[s].posts.length, hasMore: all.byStatus[s].hasMore }])) as DashboardSnapshot["counts"],
+        posts: STATUSES.flatMap((s) => all.byStatus[s].posts.map((p) => ({ ...p, status: s }))).sort((a,b) => Date.parse(b.sentAt ?? b.createdAt ?? b.dueAt ?? "") - Date.parse(a.sentAt ?? a.createdAt ?? a.dueAt ?? "")),
+      };
+      const { error } = await supabaseAdmin.from("dashboard_snapshots").update({ snapshot, updated_at: new Date().toISOString(), cooldown_until: new Date(Date.now() + DASHBOARD_COOLDOWN_MS).toISOString() }).eq("user_id", uid).eq("refresh_id", refreshId);
+      status = error ? "error" : "ok";
+    } catch (e) {
+      status = e instanceof RateLimited ? "busy" : e instanceof Reconnect ? "reconnect" : "error";
+      if (e instanceof RateLimited) await supabaseAdmin.from("dashboard_snapshots").update({ cooldown_until: new Date(Date.now() + (e.retryAfterMin === null ? DASHBOARD_COOLDOWN_MS : e.retryAfterMin * 60_000)).toISOString() }).eq("user_id", uid).eq("refresh_id", refreshId);
+    } finally {
+      await supabaseAdmin.from("dashboard_snapshots").update({ refresh_id: null, lock_until: null }).eq("user_id", uid).eq("refresh_id", refreshId);
+    }
+    return { ...await read(), status };
   });
 
 // ---------- Writes (never publish automatically; scheduling only on explicit user action) ----------
@@ -396,7 +456,7 @@ export type IdeasResult = ({ status: "ok"; ideas: BufferIdea[] } & Stale) | { st
 export const getBufferIdeas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(forceInput)
-  .handler(({ data, context }) => cached(`${context.userId}:ideas`, !!data?.force, () => guard(async () => {
+  .handler(({ data, context }) => data?.savedOnly ? Promise.resolve((cache.get(`${context.userId}:ideas`)?.value ?? lastGood.get(`${context.userId}:ideas`) ?? { status: "ok", ideas: [] }) as IdeasResult) : cached(`${context.userId}:ideas`, !!data?.force, () => guard(async () => {
     const orgs = await orgIdsFor(context.userId);
     const token = await getToken(context.userId);
     const ideas: BufferIdea[] = [];
@@ -513,6 +573,7 @@ export const deleteMySynoraData = createServerFn({ method: "POST" })
       supabaseAdmin.from("magic_caption_usage").delete().eq("user_id", uid),
       supabaseAdmin.from("user_preferences").delete().eq("user_id", uid),
       supabaseAdmin.from("buffer_connections").delete().eq("user_id", uid),
+      supabaseAdmin.from("dashboard_snapshots").delete().eq("user_id", uid),
     ]);
     if (steps.some((s) => s.error)) ok = false;
     forgetUser(uid);
