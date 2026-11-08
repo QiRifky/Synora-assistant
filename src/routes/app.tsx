@@ -1,6 +1,7 @@
 import { DiscoverNavIcon } from "@/components/ui/discover-nav-icon";
 import { DraftsNavIcon } from "@/components/ui/drafts-nav-icon";
 import { CalendarNavIcon } from "@/components/ui/calendar-nav-icon";
+import { SetupNavIcon } from "@/components/ui/setup-nav-icon";
 import { PlanShipNavIcon } from "@/components/ui/plan-ship-nav-icon";
 import { IdeasNavIcon } from "@/components/ui/ideas-nav-icon";
 import { PhotoNavIcon } from "@/components/ui/photo-nav-icon";
@@ -67,11 +68,11 @@ export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
 ];
 
 const navItem = (id: View) => { const n = NAV.find((x) => x.id === id)!; return { id: n.id, title: n.label, icon: n.icon }; };
-const NAV_GROUPS: NavGroupData<View>[] = [
+export const NAV_GROUPS: NavGroupData<View>[] = [
   { items: [navItem("overview")] },
   { heading: "Create", icon: CreateNavIcon as unknown as typeof Sparkles, items: [navItem("posts"), navItem("photo"), navItem("ideas")] },
   { heading: "Plan & Ship", icon: PlanShipNavIcon as unknown as typeof CalendarClock, items: [navItem("discover"), navItem("drafts"), navItem("calendar")] },
-  { heading: "Set up", icon: SlidersHorizontal, items: [navItem("channels")] },
+  { heading: "Set up", icon: SetupNavIcon as unknown as typeof SlidersHorizontal, items: [navItem("channels")] },
 ];
 
 function PageHeader({ title, onRefresh, busy }: { title: string; onRefresh?: () => void; busy?: boolean }) {
