@@ -1,3 +1,4 @@
+import { PhotoNavIcon } from "@/components/ui/photo-nav-icon";
 import { PostsNavIcon } from "@/components/ui/posts-nav-icon";
 import { CreateNavIcon } from "@/components/ui/package-plus-icon";
 import { OverviewNavIcon } from "@/components/ui/layout-dashboard-icon";
@@ -57,7 +58,7 @@ export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "discover", label: "Discover", icon: Compass },
-  { id: "photo", label: "Photo Studio", icon: ImageIcon },
+  { id: "photo", label: "Photo Studio", icon: PhotoNavIcon as unknown as typeof ImageIcon },
 ];
 
 const navItem = (id: View) => { const n = NAV.find((x) => x.id === id)!; return { id: n.id, title: n.label, icon: n.icon }; };
