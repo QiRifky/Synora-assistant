@@ -1,3 +1,4 @@
+import { PostsNavIcon } from "@/components/ui/posts-nav-icon";
 import { CreateNavIcon } from "@/components/ui/package-plus-icon";
 import { OverviewNavIcon } from "@/components/ui/layout-dashboard-icon";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
@@ -51,7 +52,7 @@ export type View = "overview" | "channels" | "posts" | "drafts" | "calendar" | "
 export const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: OverviewNavIcon as unknown as typeof LayoutDashboard },
   { id: "channels", label: "Channels", icon: Radio },
-  { id: "posts", label: "Posts", icon: FileText },
+  { id: "posts", label: "Posts", icon: PostsNavIcon as unknown as typeof FileText },
   { id: "drafts", label: "Drafts", icon: FileEdit },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
