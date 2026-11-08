@@ -195,6 +195,7 @@ export function TemplateLibrary({ onUse }: { onUse: (text: string) => void }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("All");
   const [open, setOpen] = useState<Template | null>(null);
+  const [opened, setOpened] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -220,12 +221,19 @@ export function TemplateLibrary({ onUse }: { onUse: (text: string) => void }) {
           aria-label="Search templates"
           className={input}
         />
+        {!opened && !query.trim() ? (
         <FolderShelf
-          groups={CATEGORIES.map((c) => ({ key: c, label: c, items: TEMPLATES.filter((t) => t.category === c).map((t) => t.title) }))}
-          selected={category === "All" ? null : category}
-          onSelect={(k) => setCategory(k ?? "All")}
-          allLabel="All templates"
+          twoTap
+          groups={[
+            { key: "All", label: "All templates", items: TEMPLATES.map((t) => t.title) },
+            ...CATEGORIES.map((c) => ({ key: c, label: c, items: TEMPLATES.filter((t) => t.category === c).map((t) => t.title) })),
+          ]}
+          selected={null}
+          onSelect={(k) => { setCategory(k ?? "All"); setOpened(true); }}
         />
+        ) : (
+        <>
+        <button type="button" onClick={() => { setOpened(false); setQuery(""); }} className="text-sm text-primary underline-offset-4 hover:underline">← Back to folders</button>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
           {["All", ...CATEGORIES].map((c) => (
             <button
@@ -238,9 +246,11 @@ export function TemplateLibrary({ onUse }: { onUse: (text: string) => void }) {
             </button>
           ))}
         </div>
+        </>
+        )}
       </div>
 
-      {filtered.length === 0 ? (
+      {!opened && !query.trim() ? null : filtered.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground">No templates found. Try another word.</p>
       ) : (
         // Hover-reveal grid: hovering one card de-emphasizes the others.
