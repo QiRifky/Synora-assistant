@@ -18,7 +18,7 @@ function draw(begin: number, dur: number) {
   );
 }
 
-function SmilIcon({ shapes, className, spin, size = 14 }: { shapes: Shape[]; className?: string; spin?: boolean; size?: number }) {
+function SmilIcon({ shapes, className, spin, size = 14 }: { shapes: Shape[]; className?: string | undefined; spin?: boolean; size?: number }) {
   const els: ReactNode[] = shapes.map((s, i) => {
     const common = { key: i, pathLength: 1, strokeDasharray: "1 1", strokeDashoffset: 0 } as const;
     const anim = draw(i * 0.08, 0.6);
